@@ -105,14 +105,29 @@ def selectGame():
 
 def selectCmdSeq(game):
 	cmdSeqPath = path.join(commonPath, game, "bin\CmdSeq.wc")
+	gameBin = path.join(commonPath, game)
+
+	postCompilerCmd = {
+		"exe": path.join(gameBin, "postcompiler\\bin\postcompiler.exe"),
+		"args": "--propcombine $path\$file"
+	}
+
 	if path.isfile(cmdSeqPath):
 		with open(cmdSeqPath, "rb") as cmdfile:
-			data = dict(cmdseq.parse(cmdfile))
-			
+			data = cmdseq.parse(cmdfile)
+		for config in data:
+			foundBsp = False
+			commands = data.get(config)
+			for cmd in commands:
+				exeValue = getattr(cmd, "exe")
+				if foundBsp:
+					if "postcompiler" not in str(exeValue).lower():
+						commands.insert(commands.index(cmd), {'exe': postCompilerCmd["exe"], 'enabled': True, 'args': postCompilerCmd["args"], 'ensure_file': None, 'use_proc_win': False, 'no_wait': False})
+					break
+				if exeValue == "$bsp_exe":
+					foundBsp = True
+					continue
 
-					
-					
-						
 	else:
 		print(f"Couldn't find the CmdSeq.wc file in the game '{game}'. Perhaps you forgot to launch Hammer for the first time?")
 		quit()
