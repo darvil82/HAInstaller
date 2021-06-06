@@ -65,6 +65,19 @@ def msglogger(string, type=None, end="\n"):
 
 
 
+def get_indent(string) -> str:
+		indent = ""
+		for x in string:
+			if x in {" ", "\t"}:
+				indent += x
+			else:
+				return indent
+
+
+
+
+
+
 def getSteamPath() -> str:
 	"""
 	Return a string with the path where Steam is located. First checks the registry key for SteamPath, and if it can't find it, the path will be prompted to the user.
@@ -203,43 +216,6 @@ def parseCmdSeq():
 
 
 
-def downloadAddons():
-	"""
-	Download and unzip all necessary files.
-	"""
-	
-	gamePath = path.join(commonPath, selectedGame)
-	url = "https://api.github.com/repos/TeamSpen210/HammerAddons/releases/latest"
-
-	try:
-		with request.urlopen(url) as data:
-			release = jsonLoads(data.read())
-			dwnUrl = release.get("assets")[0].get("browser_download_url")
-			version = release.get("tag_name")
-
-			msglogger(f"Downloading required files of latest version {version}", "loading")
-
-			with request.urlopen(dwnUrl) as data, TemporaryFile() as tempfile:
-				tempfile.write(data.read())
-				with ZipFile(tempfile) as zipfile:
-					for file in zipfile.namelist():
-						if file.startswith("postcompiler/"):
-							zipfile.extract(file, path.join(gamePath, "bin\\"))
-						elif file.startswith("hammer/"):
-							zipfile.extract(file, gamePath)
-						elif file.startswith(f"instances/{inGameFolder}"):
-							zipfile.extract(file, path.join(gamePath, "sdk_content\\maps\\"))
-				
-					zipfile.extract(f"{AVAILABLE_GAMES.get(selectedGame)}.fgd", path.join(gamePath, "bin\\"))
-	except Exception:
-		msglogger("An error ocurred while downloading the files", "error")
-		closeScript()
-	
-	msglogger("Downloaded all files!", "good")
-
-
-
-
 
 
 
@@ -249,14 +225,6 @@ def parseGameInfo():
 	"""
 	msglogger("Checking GameInfo.txt", "loading")
 	gameInfoPath = path.join(commonPath, selectedGame, inGameFolder, "gameinfo.txt")
-
-	def get_indent(string) -> str:
-		indent = ""
-		for x in string:
-			if x in {" ", "\t"}:
-				indent += x
-			else:
-				return indent
 	
 	if not path.exists(gameInfoPath):
 		msglogger(f"Couldn't find the file '{gameInfoPath}'", "error")
@@ -276,6 +244,85 @@ def parseGameInfo():
 					file.write(line)
 			msglogger("Added a new entry", "good")
 			break
+
+
+
+
+
+
+
+
+
+
+
+
+
+def downloadAddons():
+	"""
+	Download and unzip all necessary files.
+	"""
+	
+	gamePath = path.join(commonPath, selectedGame)
+	url = "https://api.github.com/repos/TeamSpen210/HammerAddons/releases/latest"
+	url2 = "https://raw.githubusercontent.com/DarviL82/HAInstaller/main/resources/srctools.vdf"
+
+	try:
+		with request.urlopen(url) as data:
+			release = jsonLoads(data.read())
+			dwnUrl = release.get("assets")[0].get("browser_download_url")
+			version = release.get("tag_name")
+
+			msglogger(f"Downloading required files of latest version {version}", "loading")
+
+
+			# Download all required files for HammerAddons
+			with request.urlopen(dwnUrl) as data, TemporaryFile() as tempfile:
+				tempfile.write(data.read())
+				with ZipFile(tempfile) as zipfile:
+					for file in zipfile.namelist():
+						if file.startswith("postcompiler/"):
+							zipfile.extract(file, path.join(gamePath, "bin\\"))
+						elif file.startswith("hammer/"):
+							zipfile.extract(file, gamePath)
+						elif file.startswith(f"instances/{inGameFolder}"):
+							zipfile.extract(file, path.join(gamePath, "sdk_content\\maps\\"))
+
+					if isinstance(AVAILABLE_GAMES.get(selectedGame), str):
+						zipfile.extract(f"{AVAILABLE_GAMES.get(selectedGame)}.fgd", path.join(gamePath, "bin\\"))
+					else:
+						zipfile.extract(f"{AVAILABLE_GAMES.get(selectedGame)[1]}.fgd", path.join(gamePath, "bin\\"))
+			
+
+			# Download srctools.vdf, so we can modify it to have the correct game folder inside.
+			if not path.exists(path.join(gamePath, "srctools.vdf")):
+				with request.urlopen(url2) as data:
+					with open(path.join(gamePath, "srctools.vdf"), "wb") as file:
+						file.write(data.read())
+				
+			with open(path.join(gamePath, "srctools.vdf")) as file:
+				data = list(file)
+			
+			for number, line in reversed(list(enumerate(data))):
+				strip_line = clean_line(line)
+				if f"\"gameinfo\" \"{inGameFolder}/\"" in strip_line:
+					break
+				elif "\"gameinfo\"" in strip_line:
+					data.pop(number)
+					data.insert(number, f"{get_indent(line)}\"gameinfo\" \"{inGameFolder}/\"")
+					break
+			
+			with open(path.join(gamePath, "srctools.vdf"), "w") as file:
+				for line in data:
+					file.write(line)
+
+	except Exception as error:
+		msglogger(f"An error ocurred while downloading the files ({error})", "error")
+		closeScript()
+	
+	msglogger("Downloaded all files!", "good")
+
+
+
 
 
 
