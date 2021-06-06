@@ -8,7 +8,7 @@
 </div>
 
 ## Features
-Automatic installer for TeamSpen's Hammer Addons, featuring:
+Automatic installer for [TeamSpen's Hammer Addons](https://github.com/TeamSpen210/HammerAddons), featuring:
 * Find the user's Steam path location.
 * Game selector which displays what games the user has installed, and compatible with the addons.
 * Download the latest files from TeamSpen's repository.
