@@ -1,2 +1,5 @@
 HA_assets
 *.wc
+__pycache__
+buildshit
+*.bat

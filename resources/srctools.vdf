@@ -1,0 +1,99 @@
+"Config"
+	{
+	// The main game folder. portal2/ for Portal 2, csgo/ for CSGO, etc.
+	// This is relative to the config file.
+	// Default Value: "portal2/"
+	"gameinfo" "portal2/"
+
+
+	// Automatically find and pack files in the map. 
+	// If this is disabled, specifically-indicated files will still be 
+	// added as well as their dependencies.
+	// Default Value: "1"
+	"auto_pack" "1"
+
+
+	// Allow files in VPKs to be packed into the map. 
+	// This is disabled by default since these are usually default files.
+	// Default Value: "0"
+	"pack_vpk" "0"
+
+
+	// Add additional search paths to the game. Each key-value pair
+	// defines a path, with the value either a folder path or a VPK 
+	// filename relative to the game root. The key defines the behaviour:
+	// * "prefix" "folder/" adds the path to the start, so it overrides
+	//     all others.
+	// * "path" "vpk_path.vpk" adds the path to the end, so it is checked last.
+	// * "nopack" "folder/" prohibits files in this path from being packed, you'll need to use one of the others also to add the path.
+	"searchpaths"
+		{
+		}
+
+
+	// Generate and pack game_sounds_manifest.txt, with all used soundscripts.     
+	// This is needed to make packing soundscripts work for the Portal 2 
+	// workshop.
+	// Default Value: "0"
+	"soundscript_manifest" "0"
+
+
+	// Set the path to StudioMDL so the compiler can generate props.
+	// If blank these features are disabled.
+	// This is relative to the game root.
+	// Default Value: "bin/studiomdl.exe"
+	"studiomdl" "bin/studiomdl.exe"
+
+
+	// Before L4D, entity I/O used ',' to seperate the different parts.
+	// 
+	// Later games used a special symbol to delimit the sections, allowing
+	// commas to be used in outputs. The compiler will guess which to use
+	// based on existing outputs in the map, but if this is incorrect 
+	// (or if there aren't any in the map), use this to override.
+	// "use_comma_sep" ""
+
+
+	// Define where the QC files are for combinable static props.
+	// This path is searched recursively. This defaults to 
+	// the 'content/' folder, which is adjacent to the game root.
+	// This is how Valve sets up their file structure.
+	"propcombine_qc_folder"
+		{
+		"loc" "../content"
+		}
+
+
+	// If enabled, Crowbar will be used to decompile models which don't have
+	// a QC in the provided QC folder.
+	// Default Value: "1"
+	"propcombine_crowbar" "1"
+
+
+	// Cache location for models decompiled for combining.
+	// Default Value: "decomp_cache/"
+	"propcombine_cache" "decomp_cache/"
+
+
+	// If greater than zero, combine props at least this close together.
+	// This is ignored if comp_propcombine_set entities are in the map.
+	// Default Value: "0"
+	"propcombine_auto_range" "0"
+
+
+	// The minimum number of props required before propcombine will
+	// bother merging them. Should be greater than 1.
+	// Default Value: "2"
+	"propcombine_min_cluster" "2"
+
+
+	// Add plugins to the post compiler. The key defines the behaviour:
+	// * "path" "folder/" loads all .py files in the folder.
+	// * "recursive" "folder/" loads all .py files in the folder and in subfolders.
+	// * "single" "folder/plugin.py" loads a single python file.
+	// The transforms folder inside the postcompiler folder is also always
+	// loaded.
+	"plugins"
+		{
+		}
+	}

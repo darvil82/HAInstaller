@@ -5,6 +5,8 @@ from tempfile import TemporaryFile
 from urllib import request
 from json import loads as jsonLoads
 from zipfile import ZipFile
+from sys import exit
+
 
 
 
@@ -12,7 +14,7 @@ from zipfile import ZipFile
 AVAILABLE_GAMES = {
 	# Game Folder:		fgdname | (fgdname, folder2)
 	"Portal 2": "portal2",
-	"Alien Swarm": "asw",
+	"Alien Swarm": ("asw", "swarm"),
 	"Black Mesa": ("bms", "blackmesa"),
 	"Counter-Strike Global Offensive": "csgo",
 	"Half-Life 2": "hl2",
@@ -21,11 +23,12 @@ AVAILABLE_GAMES = {
 	"Left 4 Dead": "l4d",
 	"Left 4 Dead 2": "left4dead2",
 	"Portal": "portal",
-	"Team Fortress 2": "tf2"
+	"Team Fortress 2": ("tf2", "tf")
 }
 
 
-GAMEINFO_ENTRY = "Game\tHammer"
+POSTCOMPILER_ARGS = "--propcombine $path\$file"
+VERSION = "1.0"
 
 
 
@@ -33,18 +36,29 @@ GAMEINFO_ENTRY = "Game\tHammer"
 
 
 
-def msglogger(string, type=None):
+
+def closeScript():
+	runsys("pause > nul")
+	exit()
+
+
+
+
+
+def msglogger(string, type=None, end="\n"):
 	"""
-	Types: good, bad, loading
+	Types: good, error, loading
 	"""
-	if type == "bad":
+	if type == "error":
 		prefix = "\x1b[91m[ E ]"
 	elif type == "good":
 		prefix = "\x1b[92m[ √ ]"
 	elif type == "loading":
 		prefix = "\x1b[33m[...]"
+	else:
+		prefix = "[   ]"
 	
-	print(f"{prefix} {string}\x1b[0m")
+	print(f"{prefix} {string}\x1b[0m", end=end)
 
 
 
@@ -71,12 +85,12 @@ def getSteamPath() -> str:
 		if path.isdir(filename):
 			for steamfile in STEAM_CONTENTS:
 				if not path.exists(path.join(filename, steamfile)):
-					print(f"The directory '{filename}' isn't a valid Steam directory.")
+					msglogger(f"The directory '{filename}' isn't a valid Steam directory.", "error")
 					break
 				else:
 					return True
 		else:
-			print(f"The directory '{filename}' does not exist.")
+			msglogger(f"The directory '{filename}' does not exist.", "error")
 
 
 	try:
@@ -84,14 +98,15 @@ def getSteamPath() -> str:
 		folder = winreg.QueryValueEx(hkey, "SteamPath")[0]
 		winreg.CloseKey(hkey)
 	except Exception:
-		print("Couldn't find the Steam path, please specify a directory: ", end="")
+		msglogger("Couldn't find the Steam path, please specify a directory: ", "loading", "")
 		folder = input()
 
 	while not checkPath(folder):
-		print("Try again: ", end="")
+		msglogger("Try again: ", "loading", "")
 		folder = input()
 
-	msglogger(f"Got Steam path ('{folder}')", "good")
+
+	msglogger(f"Got Steam path '{folder}'", "good")
 	return folder
 
 
@@ -110,18 +125,21 @@ def selectGame():
 		if game in AVAILABLE_GAMES:
 			usingGames.append(game)
 
+	if len(usingGames) == 0:
+		msglogger("Couldn't find any game supported by HammerAddons", "error")
+		closeScript()
+	
 	msglogger("Select a game to install HammerAddons:", "loading")
-	lstCounter = 1
-	for game in usingGames:
-		print(f"\t{lstCounter}: {game}")
-		lstCounter += 1
+	for number, game in enumerate(usingGames):
+		print(f"\t{number + 1}: {game}")
 	
 	while True:
 		try:
 			usrInput = int(input())
 			if usrInput not in range(1, len(usingGames) + 1):
 				raise ValueError
-			print("\x1b[A\x1b[2K", end="")
+			
+			print(f"\x1b[{len(usingGames) + 1}A\x1b[0J", end="")
 			msglogger(f"Selected game '{usingGames[usrInput - 1]}'", "good")
 			return usingGames[usrInput - 1]
 
@@ -129,7 +147,7 @@ def selectGame():
 			print("\x1b[A\x1b[2K", end="")
 			pass
 
-	
+
 
 
 
@@ -147,8 +165,8 @@ def parseCmdSeq():
 	cmdsAdded = 0
 
 	postCompilerCmd = {
-		"exe": path.join(gameBin, "postcompiler\\bin\postcompiler.exe"),
-		"args": "--propcombine $path\$file"
+		"exe": path.join(gameBin, "postcompiler\\postcompiler.exe"),
+		"args": POSTCOMPILER_ARGS
 	}
 
 	if path.isfile(cmdSeqPath):
@@ -173,13 +191,12 @@ def parseCmdSeq():
 			cmdseq.write(data, cmdfile)
 		
 		if cmdsAdded == 0:
-			msglogger("No need to add more commands", "good")
+			msglogger("Found already existing commands", "good")
 		else: msglogger(f"Added {cmdsAdded} command/s successfully", "good")
 
 	else:
-		msglogger(f"Couldn't find the CmdSeq.wc file in the game '{selectedGame}'. Perhaps you forgot to launch Hammer for the first time?", "bad")
-		quit()
-	
+		msglogger(f"Couldn't find the CmdSeq.wc file in the game '{selectedGame}'. Perhaps you forgot to launch Hammer for the first time?", "error")
+		closeScript()
 
 
 
@@ -194,26 +211,30 @@ def downloadAddons():
 	gamePath = path.join(commonPath, selectedGame)
 	url = "https://api.github.com/repos/TeamSpen210/HammerAddons/releases/latest"
 
-	with request.urlopen(url) as data:
-		release = jsonLoads(data.read())
-		dwnUrl = release.get("assets")[0].get("browser_download_url")
-		version = release.get("tag_name")
+	try:
+		with request.urlopen(url) as data:
+			release = jsonLoads(data.read())
+			dwnUrl = release.get("assets")[0].get("browser_download_url")
+			version = release.get("tag_name")
 
-		msglogger(f"Downloading required files of latest version {version}", "loading")
+			msglogger(f"Downloading required files of latest version {version}", "loading")
 
-		with request.urlopen(dwnUrl) as data, TemporaryFile() as tempfile:
-			tempfile.write(data.read())
-			with ZipFile(tempfile) as zipfile:
-				for file in zipfile.namelist():
-					if file.startswith("postcompiler/"):
-						zipfile.extract(file, path.join(gamePath, "bin\\"))
-					elif file.startswith("hammer/"):
-						zipfile.extract(file, gamePath)
-					elif file.startswith(f"instances/{inGameFolder}"):
-						zipfile.extract(file, path.join(gamePath, "sdk_content\\maps\\"))
-			
-				zipfile.extract(f"{AVAILABLE_GAMES.get(selectedGame)}.fgd", path.join(gamePath, "bin\\"))
-
+			with request.urlopen(dwnUrl) as data, TemporaryFile() as tempfile:
+				tempfile.write(data.read())
+				with ZipFile(tempfile) as zipfile:
+					for file in zipfile.namelist():
+						if file.startswith("postcompiler/"):
+							zipfile.extract(file, path.join(gamePath, "bin\\"))
+						elif file.startswith("hammer/"):
+							zipfile.extract(file, gamePath)
+						elif file.startswith(f"instances/{inGameFolder}"):
+							zipfile.extract(file, path.join(gamePath, "sdk_content\\maps\\"))
+				
+					zipfile.extract(f"{AVAILABLE_GAMES.get(selectedGame)}.fgd", path.join(gamePath, "bin\\"))
+	except Exception:
+		msglogger("An error ocurred while downloading the files", "error")
+		closeScript()
+	
 	msglogger("Downloaded all files!", "good")
 
 
@@ -226,7 +247,7 @@ def parseGameInfo():
 	"""
 	Add the 'Game	Hammer' entry into the Gameinfo file while keeping the old contents.
 	"""
-	msglogger("Modifying the GameInfo.txt file", "loading")
+	msglogger("Checking GameInfo.txt", "loading")
 	gameInfoPath = path.join(commonPath, selectedGame, inGameFolder, "gameinfo.txt")
 
 	def get_indent(string) -> str:
@@ -236,24 +257,25 @@ def parseGameInfo():
 				indent += x
 			else:
 				return indent
+	
+	if not path.exists(gameInfoPath):
+		msglogger(f"Couldn't find the file '{gameInfoPath}'", "error")
+		closeScript()
 
 	with open(gameInfoPath, encoding="utf8") as file:
 		data = list(file)
 	for number, line in reversed(list(enumerate(data))):
 		strip_line = clean_line(line)
-		if strip_line == GAMEINFO_ENTRY:
-			msglogger("Already modified!", "good")
+		if "game" in strip_line.lower() and "hammer" in strip_line.lower():
+			msglogger("No need to modify", "good")
 			break
 		elif "|gameinfo_path|" in strip_line:
-			data.insert(number + 1, f"{get_indent(line)}{GAMEINFO_ENTRY}\n")
+			data.insert(number + 1, f"{get_indent(line)}Game\tHammer\n")
 			with open(gameInfoPath, "w") as file:
 				for line in data:
 					file.write(line)
-			msglogger("Done!", "good")
+			msglogger("Added a new entry", "good")
 			break
-		
-	
-	
 
 
 
@@ -262,8 +284,6 @@ def parseGameInfo():
 
 
 
-
-	
 
 
 
@@ -272,13 +292,13 @@ def parseGameInfo():
 def main():
 	global inGameFolder, selectedGame, steamPath, commonPath
 
-	steamPath = getSteamPath()
-	
-
-	commonPath = path.join(steamPath, "steamapps\common")
 	runsys("")
+	print(f"\nTeamSpen's Hammer Addons Installer - {VERSION}\n")
 
 	try:
+		steamPath = getSteamPath()
+		commonPath = path.join(steamPath, "steamapps\common")
+		
 		selectedGame = selectGame()
 		
 		if isinstance(AVAILABLE_GAMES.get(selectedGame), str):
@@ -289,28 +309,13 @@ def main():
 		parseCmdSeq()
 		parseGameInfo()
 		downloadAddons()
+
 	except KeyboardInterrupt:
-		msglogger("Installation Interrupted", "bad")
+		msglogger("Installation Interrupted", "error")
 		quit()
+	
 	msglogger(f"Finished installing HammerAddons for {selectedGame}!", "good")
-
-	
-	
-
-
-
-
-
-
-	
-
-
-	
-	
-
-		
-
-
+	closeScript()
 
 
 
