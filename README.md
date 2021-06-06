@@ -1,10 +1,6 @@
 <div align="center">
-	<table>
-	<tr>
-		<td><img src="https://raw.githubusercontent.com/TeamSpen210/HammerAddons/master/logo/icon_256.png" alt="Hammer Addons" height="200"></td>
-		<td><h1> TeamSpen's Hammer Addons Installer </h1></td>
-	</tr>
-	</table>
+	<img src="https://raw.githubusercontent.com/TeamSpen210/HammerAddons/master/logo/icon_256.png" alt="Hammer Addons" height="200">
+	<h1> TeamSpen's Hammer Addons Installer </h1>
 </div>
 
 ## Features
