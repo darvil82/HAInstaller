@@ -22,5 +22,8 @@ Automatic installer for TeamSpen's Hammer Addons, featuring:
 
 <hr>
 
+## Download
+Executable file available at the [releases page](https://github.com/DarviL82/HAInstaller/releases/latest).
+
 ## Special Thanks
 * TeamSpen for creating the addons and srctools.
