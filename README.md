@@ -22,3 +22,5 @@ Automatic installer for TeamSpen's Hammer Addons, featuring:
 
 <hr>
 
+## Special Thanks
+* TeamSpen for creating the addons and srctools.
