@@ -359,7 +359,7 @@ def main():
 
 	except KeyboardInterrupt:
 		msglogger("Installation Interrupted", "error")
-		quit()
+		closeScript()
 	
 	msglogger(f"Finished installing HammerAddons for {selectedGame}!", "good")
 	closeScript()
