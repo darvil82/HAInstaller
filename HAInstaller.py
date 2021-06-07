@@ -1,5 +1,5 @@
 import winreg
-from os import path, listdir, system as runsys
+from os import close, path, listdir, system as runsys
 from srctools import cmdseq, clean_line, Property
 from tempfile import TemporaryFile
 from urllib import request
@@ -30,7 +30,7 @@ AVAILABLE_GAMES = {
 
 
 POSTCOMPILER_ARGS = "--propcombine $path\$file"
-VERSION = "1.2"
+VERSION = "1.3"
 
 
 
@@ -120,6 +120,7 @@ def parseArgs():
         formatter_class=argparse.RawTextHelpFormatter
     )
     argparser.add_argument("-a", "--args", help=f"Arguments for a hammer compile step. Default are '{POSTCOMPILER_ARGS}'", default=POSTCOMPILER_ARGS)
+    argparser.add_argument("-g", "--game", help="The name of the game folder in which the addons will be installed.")
     argparser.add_argument("--skipCmdSeq", help="Do not modify the CmdSeq.wc file.", action="store_false")
     argparser.add_argument("--skipGameinfo", help="Do not modify the gameinfo.txt file.", action="store_false")
     argparser.add_argument("--skipDownload", help="Do not download any files.", action="store_false")
@@ -227,6 +228,20 @@ def selectGame(steamlibs) -> tuple:
     if len(usingGames) == 0:
         msglogger("Couldn't find any game supported by HammerAddons", "error")
         closeScript()
+    
+
+    if args.game:
+        if args.game in AVAILABLE_GAMES:
+            for game, lib in usingGames:
+                if args.game == game:
+                    msglogger(f"Selected game '{args.game}'", "good")
+                    return tuple((args.game, lib))
+            
+            msglogger(f"The game '{args.game}' is not installed", "error")
+        else:
+            msglogger(f"The game '{args.game}' is not supported", "error")
+        
+    
     
     msglogger("Select a game to install HammerAddons:", "loading")
     for number, game in enumerate(usingGames):
@@ -452,7 +467,7 @@ def main():
         msglogger("Installation interrupted", "error")
         closeScript()
     
-    msglogger(f"Finished installing HammerAddons for {selectedGame}!", "good")
+    msglogger(f"Finished installing HammerAddons for '{selectedGame}'!", "good")
     closeScript()
 
 
