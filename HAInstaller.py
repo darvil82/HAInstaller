@@ -1,5 +1,5 @@
 import winreg
-from os import close, path, listdir, system as runsys
+from os import path, listdir, system as runsys
 from srctools import cmdseq, clean_line, Property
 from tempfile import TemporaryFile
 from urllib import request
