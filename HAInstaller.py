@@ -1,6 +1,6 @@
 from os import path, listdir, system as runsys
 import winreg
-from srctools import cmdseq, clean_line
+from srctools import cmdseq, clean_line, Property
 from tempfile import TemporaryFile
 from urllib import request
 from json import loads as jsonLoads
@@ -28,7 +28,7 @@ AVAILABLE_GAMES = {
 
 
 POSTCOMPILER_ARGS = "--propcombine $path\$file"
-VERSION = "1.0"
+VERSION = "1.1"
 
 
 
@@ -46,9 +46,8 @@ def closeScript():
 
 
 def msglogger(string, type=None, end="\n"):
-	"""
-	Types: good, error, loading
-	"""
+	"""Types: good, error, loading"""
+
 	if type == "error":
 		prefix = "\x1b[91m[ E ]"
 	elif type == "good":
@@ -66,22 +65,23 @@ def msglogger(string, type=None, end="\n"):
 
 
 def get_indent(string) -> str:
-		indent = ""
-		for x in string:
-			if x in {" ", "\t"}:
-				indent += x
-			else:
-				return indent
+	"""Return indentation from supplied string"""
+
+	indent = ""
+	for x in string:
+		if x in {" ", "\t"}:
+			indent += x
+		else:
+			return indent
 
 
 
 
 
 
-def getSteamPath() -> str:
-	"""
-	Return a string with the path where Steam is located. First checks the registry key for SteamPath, and if it can't find it, the path will be prompted to the user.
-	"""
+def getSteamPath() -> list:
+	"""Return a list with with all the steam libraries. First checks the registry key for SteamPath, and if it can't find it, the path will be prompted to the user."""
+
 	def checkPath(filename: str) -> bool:
 		"""
 		Check if the filepath supplied is valid and actually contains Steam.
@@ -117,10 +117,22 @@ def getSteamPath() -> str:
 	while not checkPath(folder):
 		msglogger("Try again: ", "loading", "")
 		folder = input()
+	
 
+	steamlibs = [folder]
+	# Find other steam libraries (thanks TeamSpen)
+	try:
+		with open(path.join(folder, "steamapps/libraryfolders.vdf")) as file:
+			conf = Property.parse(file)
+	except FileNotFoundError:
+			pass
+	else:
+		for prop in conf.find_key("LibraryFolders"):
+			if prop.name.isdigit():
+				steamlibs.append(prop.value)
 
 	msglogger(f"Got Steam path '{folder}'", "good")
-	return folder
+	return steamlibs
 
 
 
@@ -129,14 +141,16 @@ def getSteamPath() -> str:
 
 
 
-def selectGame():
-	"""
-	Let the user select one of their games.
-	"""
+def selectGame(steamlibs) -> tuple:
+	"""Let the user select one of their games."""
+
 	usingGames = []
-	for game in listdir(commonPath):
-		if game in AVAILABLE_GAMES:
-			usingGames.append(game)
+	for lib in steamlibs:
+		common = path.join(lib, "steamapps/common")
+		for game in listdir(common):
+			if game in AVAILABLE_GAMES:
+				usingGames.append((game, lib))
+	
 
 	if len(usingGames) == 0:
 		msglogger("Couldn't find any game supported by HammerAddons", "error")
@@ -144,8 +158,8 @@ def selectGame():
 	
 	msglogger("Select a game to install HammerAddons:", "loading")
 	for number, game in enumerate(usingGames):
-		print(f"\t{number + 1}: {game}")
-	
+		print(f"\t{number + 1}: {game[0]}")
+
 	while True:
 		try:
 			usrInput = int(input())
@@ -153,7 +167,7 @@ def selectGame():
 				raise ValueError
 			
 			print(f"\x1b[{len(usingGames) + 1}A\x1b[0J", end="")
-			msglogger(f"Selected game '{usingGames[usrInput - 1]}'", "good")
+			msglogger(f"Selected game '{usingGames[usrInput - 1][0]}'", "good")
 			return usingGames[usrInput - 1]
 
 		except (ValueError, IndexError):
@@ -168,9 +182,8 @@ def selectGame():
 
 
 def parseCmdSeq():
-	"""
-	Read the user's CmdSeq.wc file, and add the postcompiler commands to it. This will also check if there's already a postcompiler command being used.
-	"""
+	"""Read the user's CmdSeq.wc file, and add the postcompiler commands to it. This will also check if there's already a postcompiler command being used."""
+
 	msglogger("Adding postcompiler compile commands", "loading")
 	
 	gameBin = path.join(commonPath, selectedGame, "bin\\")
@@ -220,9 +233,8 @@ def parseCmdSeq():
 
 
 def parseGameInfo():
-	"""
-	Add the 'Game	Hammer' entry into the Gameinfo file while keeping the old contents.
-	"""
+	"""Add the 'Game	Hammer' entry into the Gameinfo file while keeping the old contents."""
+
 	msglogger("Checking GameInfo.txt", "loading")
 	gameInfoPath = path.join(commonPath, selectedGame, inGameFolder, "gameinfo.txt")
 	
@@ -258,9 +270,7 @@ def parseGameInfo():
 
 
 def downloadAddons():
-	"""
-	Download and unzip all necessary files.
-	"""
+	"""Download and unzip all necessary files."""
 	
 	gamePath = path.join(commonPath, selectedGame)
 	url = "https://api.github.com/repos/TeamSpen210/HammerAddons/releases/latest"
@@ -343,10 +353,10 @@ def main():
 	print(f"\nTeamSpen's Hammer Addons Installer - {VERSION}\n")
 
 	try:
-		steamPath = getSteamPath()
-		commonPath = path.join(steamPath, "steamapps\common")
+		steamlibs = getSteamPath()
+		selectedGame, steamPath = selectGame(steamlibs)
 		
-		selectedGame = selectGame()
+		commonPath = path.join(steamPath, "steamapps\common")
 		
 		if isinstance(AVAILABLE_GAMES.get(selectedGame), str):
 			inGameFolder = AVAILABLE_GAMES.get(selectedGame)
