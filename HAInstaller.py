@@ -12,25 +12,26 @@ from textwrap import dedent
 
 
 
-
+POSTCOMPILER_ARGS = "--propcombine $path\$file"
+VERSION = "1.3.1"
 AVAILABLE_GAMES = {
-    # Game Folder:		fgdname | (fgdname, folder2)
-    "Portal 2": "portal2",
+    # Game definitions. These specify the name of the main game folder, and for every game, the fgd, and the second game folder inside.
+    # Game Folder: (fgdname, folder2)
+    
     "Alien Swarm": ("asw", "swarm"),
     "Black Mesa": ("bms", "blackmesa"),
-    "Counter-Strike Global Offensive": "csgo",
-    "Half-Life 2": "hl2",
-    "Garry's Mod": "gmod",
-    "Infra": "infra",
-    "Left 4 Dead": "l4d",
-    "Left 4 Dead 2": "left4dead2",
-    "Portal": "portal",
+    "Counter-Strike Global Offensive": ("csgo", "csgo"),
+    "GarrysMod": ("gmod", "garrysmod"),
+    "Half-Life 2": ("hl2", "hl2"),
+    "Infra": ("infra", "infra"),
+    "Left 4 Dead": ("l4d", "l4d"),
+    "Left 4 Dead 2": ("left4dead2", "left4dead2"),
+    "Portal": ("portal", "portal"),
+    "Portal 2": ("portal2", "portal2"),
     "Team Fortress 2": ("tf2", "tf")
 }
 
 
-POSTCOMPILER_ARGS = "--propcombine $path\$file"
-VERSION = "1.3"
 
 
 
@@ -38,7 +39,10 @@ VERSION = "1.3"
 
 
 def msglogger(string, type=None, end="\n"):
-    """Types: good, error, loading, warning"""
+    """
+    Print a message out on the terminal.
+    - Types: `good, error, loading, warning`
+    """
 
     if type == "error":
         prefix = "\x1b[91m[ E ]"
@@ -107,6 +111,8 @@ def get_indent(string) -> str:
 
 
 def parseArgs():
+    """Parse the arguments passed to the script"""
+    
     global args
     argparser = argparse.ArgumentParser(
         epilog=dedent(f"""\
@@ -152,9 +158,9 @@ def getSteamPath() -> tuple:
     """
 
     def checkPath(filename: str) -> bool:
-        """
-        Check if the filepath supplied is valid and actually contains Steam.
-        """
+        """Check if the filepath supplied is valid and actually contains Steam."""
+
+        # All the files that the main Steam path should contain
         STEAM_CONTENTS = {
             'crashhandler.dll', 'crashhandler64.dll', 'CSERHelper.dll', 'd3dcompiler_46.dll', 'd3dcompiler_46_64.dll', 'GameOverlayRenderer.dll', 'GameOverlayRenderer64.dll',
             'GfnRuntimeSdk.dll', 'icui18n.dll', 'icuuc.dll', 'libavcodec-58.dll', 'libavformat-58.dll', 'libavresample-4.dll', 'libavutil-56.dll', 'libfreetype-6.dll',
@@ -164,6 +170,7 @@ def getSteamPath() -> tuple:
             'steamerrorreporter64.exe', 'streaming_client.exe', 'uninstall.exe', 'WriteMiniDump.exe'
         }
 
+        # Check if the path supplied is actually the true Steam path by checking if it contains every file in STEAM_CONTENTS
         if path.isdir(filename):
             for steamfile in STEAM_CONTENTS:
                 if not path.exists(path.join(filename, steamfile)):
@@ -176,19 +183,23 @@ def getSteamPath() -> tuple:
 
 
     try:
+        # Read the SteamPath registry key
         hkey = winreg.OpenKey(winreg.HKEY_CURRENT_USER, "SOFTWARE\Valve\Steam")
         folder = winreg.QueryValueEx(hkey, "SteamPath")[0]
         winreg.CloseKey(hkey)
+
     except Exception:
         msglogger("Couldn't find the Steam path, please specify a directory: ", "loading", "")
         folder = input()
 
+    # Continue asking for path until it is valid
     while not checkPath(folder):
         msglogger("Try again: ", "loading", "")
         folder = input()
-    
+
 
     steamlibs = [folder]
+
     # Find other steam libraries (thanks TeamSpen)
     try:
         with open(path.join(folder, "steamapps/libraryfolders.vdf")) as file:
@@ -217,6 +228,7 @@ def selectGame(steamlibs) -> tuple:
     Returns a tuple containing the name of the game, and the location of the library that it belongs to.
     """
 
+    # Populate usingGames with the games that the user has installed and are supported by HammerAddons
     usingGames = []
     for lib in steamlibs:
         common = path.join(lib, "steamapps/common")
@@ -224,13 +236,13 @@ def selectGame(steamlibs) -> tuple:
             if game in AVAILABLE_GAMES:
                 usingGames.append((game, lib))
     
-
     if len(usingGames) == 0:
+        # No supported games found, quitting
         msglogger("Couldn't find any game supported by HammerAddons", "error")
         closeScript()
     
-
     if args.game:
+        # Check the string passed from the game argument
         if args.game in AVAILABLE_GAMES:
             for game, lib in usingGames:
                 if args.game == game:
@@ -242,7 +254,7 @@ def selectGame(steamlibs) -> tuple:
             msglogger(f"The game '{args.game}' is not supported", "error")
         
     
-    
+    # Print a simple select menu with all the available choices
     msglogger("Select a game to install HammerAddons:", "loading")
     for number, game in enumerate(usingGames):
         print(f"\t{number + 1}: {game[0]}")
@@ -253,11 +265,13 @@ def selectGame(steamlibs) -> tuple:
             if usrInput not in range(1, len(usingGames) + 1):
                 raise ValueError
             
+            # The value is correct, so we move the cursor up the same number of lines taken by the menu to drawn, so then we can override it
             print(f"\x1b[{len(usingGames) + 1}A\x1b[0J", end="")
             msglogger(f"Selected game '{usingGames[usrInput - 1][0]}'", "good")
             return tuple(usingGames[usrInput - 1])
 
         except (ValueError, IndexError):
+            # If the value isn't valid, we move the terminal cursor up and then clear the line. This is done to not cause ugly spam when typing values
             print("\x1b[A\x1b[2K", end="")
             pass
 
@@ -277,7 +291,8 @@ def parseCmdSeq():
     cmdSeqPath = path.join(gameBin, "CmdSeq.wc")
     cmdsAdded = 0
 
-    postCompilerCmd = {
+    # Postcompiler command definition
+    POSTCOMPILER_CMD = {
         "exe": path.join(gameBin, "postcompiler\\postcompiler.exe"),
         "args": args.args
     }
@@ -286,33 +301,38 @@ def parseCmdSeq():
         with open(cmdSeqPath, "rb") as cmdfile:
             data = cmdseq.parse(cmdfile)
 
+        # We check for the existence of the bsp command. If found, we append the postcompiler command right after it
         for config in data:
             foundBsp = False
             commands = data.get(config)
+
             for cmd in commands:
                 exeValue = getattr(cmd, "exe")
                 argValue = getattr(cmd, "args")
+                
                 if foundBsp:
                     if "postcompiler" not in str(exeValue).lower():
-                        commands.insert(commands.index(cmd), cmdseq.Command(postCompilerCmd["exe"], postCompilerCmd["args"]))
+                        commands.insert(commands.index(cmd), cmdseq.Command(POSTCOMPILER_CMD["exe"], POSTCOMPILER_CMD["args"]))
                         cmdsAdded += 1
                     else:
                         if args.args.lower() != str(argValue).lower():
                             index = commands.index(cmd)
                             commands.pop(index)
-                            commands.insert(index, cmdseq.Command(postCompilerCmd["exe"], postCompilerCmd["args"]))
+                            commands.insert(index, cmdseq.Command(POSTCOMPILER_CMD["exe"], POSTCOMPILER_CMD["args"]))
                             cmdsAdded += 1
                     break
                 if exeValue == "$bsp_exe":
                     foundBsp = True
                     continue
 
-        with open(cmdSeqPath, "wb") as cmdfile:
-            cmdseq.write(data, cmdfile)
-        
         if cmdsAdded == 0:
+            # No commands were added, no need to modify
             msglogger("Found already existing commands", "warning")
-        else: msglogger(f"Added {cmdsAdded} command/s successfully", "good")
+        else:
+            with open(cmdSeqPath, "wb") as cmdfile:
+                cmdseq.write(data, cmdfile)
+            
+            msglogger(f"Added {cmdsAdded} command/s successfully", "good")
 
     else:
         msglogger(f"Couldn't find the CmdSeq.wc file in the game '{selectedGame}'. Perhaps you forgot to launch Hammer for the first time?", "error")
@@ -338,12 +358,17 @@ def parseGameInfo():
 
     with open(gameInfoPath, encoding="utf8") as file:
         data = list(file)
+    
     for number, line in reversed(list(enumerate(data))):
         strip_line = clean_line(line)
+
         if "game" in strip_line.lower() and "hammer" in strip_line.lower():
+            # Hammer is already in there, skip
             msglogger("No need to modify", "warning")
             break
+        
         elif "|gameinfo_path|" in strip_line:
+            # Append Game Hammer right after the |gameinfo_path| entry
             data.insert(number + 1, f"{get_indent(line)}Game\tHammer\n")
             with open(gameInfoPath, "w") as file:
                 for line in data:
@@ -384,6 +409,7 @@ def downloadAddons():
                 tempfile.write(data.read())
                 with ZipFile(tempfile) as zipfile:
                     for file in zipfile.namelist():
+                        # Extract the files found to the locations that we want
                         if file.startswith("postcompiler/"):
                             zipfile.extract(file, path.join(gamePath, "bin\\"))
                         elif file.startswith("hammer/"):
@@ -391,10 +417,8 @@ def downloadAddons():
                         elif file.startswith(f"instances/{inGameFolder}"):
                             zipfile.extract(file, path.join(gamePath, "sdk_content\\maps\\"))
 
-                    if isinstance(AVAILABLE_GAMES.get(selectedGame), str):
-                        zipfile.extract(f"{AVAILABLE_GAMES.get(selectedGame)}.fgd", path.join(gamePath, "bin\\"))
-                    else:
-                        zipfile.extract(f"{AVAILABLE_GAMES.get(selectedGame)[1]}.fgd", path.join(gamePath, "bin\\"))
+                    # Extract the FGD file to the bin folder
+                    zipfile.extract(f"{AVAILABLE_GAMES.get(selectedGame)[1]}.fgd", path.join(gamePath, "bin\\"))
             
 
             # Download srctools.vdf, so we can modify it to have the correct game folder inside.
@@ -406,18 +430,25 @@ def downloadAddons():
             with open(path.join(gamePath, "srctools.vdf")) as file:
                 data = list(file)
             
+            # Replace the gameinfo entry to match the game that we are installing
             for number, line in reversed(list(enumerate(data))):
                 strip_line = clean_line(line)
+
                 if f"\"gameinfo\" \"{inGameFolder}/\"" in strip_line:
+                    # We found it already in there, skip
                     break
+                
                 elif "\"gameinfo\"" in strip_line:
+                    # It isn't there, remove it and add a new one to match the game
                     data.pop(number)
                     data.insert(number, f"{get_indent(line)}\"gameinfo\" \"{inGameFolder}/\"")
+
+                    with open(path.join(gamePath, "srctools.vdf"), "w") as file:
+                        for line in data:
+                            file.write(line)
+                    
                     break
-            
-            with open(path.join(gamePath, "srctools.vdf"), "w") as file:
-                for line in data:
-                    file.write(line)
+
 
     except Exception as error:
         msglogger(f"An error ocurred while downloading the files ({error})", "error")
@@ -453,10 +484,7 @@ def main():
         
         commonPath = path.join(steamPath, "steamapps\common")
         
-        if isinstance(AVAILABLE_GAMES.get(selectedGame), str):
-            inGameFolder = AVAILABLE_GAMES.get(selectedGame)
-        else:
-            inGameFolder = AVAILABLE_GAMES.get(selectedGame)[0]
+        inGameFolder = AVAILABLE_GAMES.get(selectedGame)[0]
 
         # True is enabled
         if args.skipCmdSeq: parseCmdSeq()
