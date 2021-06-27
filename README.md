@@ -20,7 +20,7 @@ Automatic installer for [TeamSpen's Hammer Addons](https://github.com/TeamSpen21
 <hr>
 
 ## Download
-There is a standalone executable available at the [releases page](https://github.com/DarviL82/HAInstaller/releases/latest). Or you can [download the script directly](https://github.com/DarviL82/HAInstaller/blob/main/HAInstaller.py) (It requires at least Python 3, and the [srctools](https://github.com/TeamSpen210/srctools) package)
+There is a standalone executable available at the [releases page](https://github.com/DarviL82/HAInstaller/releases/latest). Or you can [download the script directly](https://github.com/DarviL82/HAInstaller/blob/main/HAInstaller.py) (It requires at least Python 3.9, and the [srctools](https://github.com/TeamSpen210/srctools) package)
 > **Note:** The binary will most likely be detected as a virus. But it obviusly isn't (I swear).
 
 ## Special Thanks
