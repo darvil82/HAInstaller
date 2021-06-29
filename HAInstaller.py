@@ -13,7 +13,7 @@ from textwrap import dedent
 
 
 POSTCOMPILER_ARGS = "--propcombine $path\$file"
-VERSION = "1.3.1"
+VERSION = "1.4"
 AVAILABLE_GAMES = {
     # Game definitions. These specify the name of the main game folder, and for every game, the fgd, and the second game folder inside.
     # Game Folder: (fgdname, folder2)
@@ -55,29 +55,24 @@ def msglogger(string, type=None, end="\n"):
     else:
         prefix = "[   ]"
     
-    print(f"{prefix} {string}\x1b[0m", end=end)
+    print(f"\x1b[4m\x1b[9999D{prefix}\x1b[24m {string}\x1b[0m\x1b[K", end=end)
 
 
 
 
 def checkUpdates():
     """Check if the latest version is not equal to the one that we are using"""
-
-    def stripVersion(string) -> str:
-        """Remove any character which isn't a number or dot"""
-        ver = ""
-        for char in string:
-            if char.isdigit() or char == ".":
-                ver += char
-        return ver
-
+    
     url = "https://api.github.com/repos/DarviL82/HAInstaller/releases/latest"
     msglogger("Checking for new versions", "loading")
 
-    with request.urlopen(url) as data:
-        release = jsonLoads(data.read())
-        # dwnUrl = release.get("assets")[0].get("browser_download_url")
-        version = stripVersion(release.get("tag_name"))
+    try:
+        with request.urlopen(url) as data:
+            release = jsonLoads(data.read())
+            version = stripVersion(release.get("tag_name"))
+    except Exception:
+        msglogger("An error ocurred while checking for updates", "error")
+        closeScript()
     
     if version != VERSION:
         msglogger(f"There is a new version available.\n\tUsing: {VERSION}\n\tLatest: {version}", "warning")
@@ -106,6 +101,17 @@ def get_indent(string) -> str:
 
 
 
+def stripVersion(string: str) -> str:
+        """Remove any character from string which isn't a number or dot"""
+
+        ver = ""
+        for char in string:
+            if char.isdigit() or char == ".":
+                ver += char
+        return ver
+
+
+
 
 
 
@@ -127,6 +133,7 @@ def parseArgs():
     )
     argparser.add_argument("-a", "--args", help=f"Arguments for a hammer compile step. Default are '{POSTCOMPILER_ARGS}'", default=POSTCOMPILER_ARGS)
     argparser.add_argument("-g", "--game", help="The name of the game folder in which the addons will be installed.")
+    argparser.add_argument("-v", "--version", help="Select the version of HammerAddons to install. Please keep in mind that all versions might not be compatible\nwith all the games. Default value is 'latest'.", default="latest")
     argparser.add_argument("--skipCmdSeq", help="Do not modify the CmdSeq.wc file.", action="store_false")
     argparser.add_argument("--skipGameinfo", help="Do not modify the gameinfo.txt file.", action="store_false")
     argparser.add_argument("--skipDownload", help="Do not download any files.", action="store_false")
@@ -255,7 +262,7 @@ def selectGame(steamlibs) -> tuple:
         
     
     # Print a simple select menu with all the available choices
-    msglogger("Select a game to install HammerAddons:", "loading")
+    msglogger("Select a game to install HammerAddons", "loading")
     for number, game in enumerate(usingGames):
         print(f"\t{number + 1}: {game[0]}")
 
@@ -287,13 +294,13 @@ def parseCmdSeq():
 
     msglogger("Adding postcompiler compile commands", "loading")
     
-    gameBin = path.join(commonPath, selectedGame, "bin\\")
+    gameBin = path.join(commonPath, selectedGame, "bin/")
     cmdSeqPath = path.join(gameBin, "CmdSeq.wc")
     cmdsAdded = 0
 
     # Postcompiler command definition
     POSTCOMPILER_CMD = {
-        "exe": path.join(gameBin, "postcompiler\\postcompiler.exe"),
+        "exe": path.join(gameBin, "postcompiler/postcompiler.exe"),
         "args": args.args
     }
 
@@ -392,64 +399,99 @@ def downloadAddons():
     """Download and unzip all necessary files."""
     
     gamePath = path.join(commonPath, selectedGame)
-    url = "https://api.github.com/repos/TeamSpen210/HammerAddons/releases/latest"
-    url2 = "https://raw.githubusercontent.com/DarviL82/HAInstaller/main/resources/srctools.vdf"
+    releasesUrl = "https://api.github.com/repos/TeamSpen210/HammerAddons/releases"
+    vdfUrl = "https://raw.githubusercontent.com/DarviL82/HAInstaller/main/resources/srctools.vdf"
+
+
+    def getZipUrl(ver) -> str:
+        """
+        Return a tuple with the version tag, and the url of the zip download page from the version specified. (`(verTag, zipUrl)`)
+        
+        - `ver` is a string containing a version value, or `latest`.
+        """
+
+        verS = stripVersion(ver)
+    
+        with request.urlopen(releasesUrl) as data:
+            data = jsonLoads(data.read())
+
+        # Create a dict with all the versionTags: zipUrls
+        # We iterate through every release getting the only values that we need, the "tag_name", and the "browser_download_url"
+        versions = {}
+        for release in data:
+            tag = stripVersion(release.get("tag_name"))
+            url = release.get("assets")[0].get("browser_download_url")
+
+            versions[tag] = url
+
+
+        if ver == "latest":
+            # If ver arg is "latest" we get the first key and value from the versions dict
+            return (tuple(versions.keys())[0], tuple(versions.values())[0])
+        elif verS in versions.keys():
+            # If the stripped ver is a key inside versions, return itself and it's value in the dict
+            return (verS, versions[verS])
+        else:
+            # We didn't succeed, generate an error message and exit
+            errorMsg = ""
+            for x in tuple(versions.keys()):
+                errorMsg += f"'{x}', "
+            
+            msglogger(f"Version '{ver}' does not exist, available versions: {errorMsg}\x1b[2D.\x1b[K", "error")
+            closeScript()
+
+     
 
     try:
-        with request.urlopen(url) as data:
-            release = jsonLoads(data.read())
-            dwnUrl = release.get("assets")[0].get("browser_download_url")
-            version = release.get("tag_name")
+        version, zipUrl = getZipUrl(args.version)
 
-            msglogger(f"Downloading required files of latest version {version}", "loading")
+        msglogger(f"Downloading required files of version {version}", "loading")
 
+        # Download all required files for HammerAddons
+        with request.urlopen(zipUrl) as data, TemporaryFile() as tempfile:
+            tempfile.write(data.read())
+            with ZipFile(tempfile) as zipfile:
+                for file in zipfile.namelist():
+                    # Extract the files found to the locations that we want
+                    if file.startswith("postcompiler/"):
+                        zipfile.extract(file, path.join(gamePath, "bin/"))
+                    elif file.startswith("hammer/"):
+                        zipfile.extract(file, gamePath)
+                    elif file.startswith(f"instances/{inGameFolder}"):
+                        zipfile.extract(file, path.join(gamePath, "sdk_content/maps/"))
 
-            # Download all required files for HammerAddons
-            with request.urlopen(dwnUrl) as data, TemporaryFile() as tempfile:
-                tempfile.write(data.read())
-                with ZipFile(tempfile) as zipfile:
-                    for file in zipfile.namelist():
-                        # Extract the files found to the locations that we want
-                        if file.startswith("postcompiler/"):
-                            zipfile.extract(file, path.join(gamePath, "bin\\"))
-                        elif file.startswith("hammer/"):
-                            zipfile.extract(file, gamePath)
-                        elif file.startswith(f"instances/{inGameFolder}"):
-                            zipfile.extract(file, path.join(gamePath, "sdk_content\\maps\\"))
+                # Extract the FGD file to the bin folder
+                zipfile.extract(f"{AVAILABLE_GAMES.get(selectedGame)[1]}.fgd", path.join(gamePath, "bin/"))
+        
 
-                    # Extract the FGD file to the bin folder
-                    zipfile.extract(f"{AVAILABLE_GAMES.get(selectedGame)[1]}.fgd", path.join(gamePath, "bin\\"))
+        # Download srctools.vdf, so we can modify it to have the correct game folder inside.
+        if not path.exists(path.join(gamePath, "srctools.vdf")):
+            with request.urlopen(vdfUrl) as data:
+                with open(path.join(gamePath, "srctools.vdf"), "wb") as file:
+                    file.write(data.read())
             
+        with open(path.join(gamePath, "srctools.vdf")) as file:
+            data = list(file)
+        
+        # Replace the gameinfo entry to match the game that we are installing
+        for number, line in reversed(list(enumerate(data))):
+            strip_line = clean_line(line)
 
-            # Download srctools.vdf, so we can modify it to have the correct game folder inside.
-            if not path.exists(path.join(gamePath, "srctools.vdf")):
-                with request.urlopen(url2) as data:
-                    with open(path.join(gamePath, "srctools.vdf"), "wb") as file:
-                        file.write(data.read())
-                
-            with open(path.join(gamePath, "srctools.vdf")) as file:
-                data = list(file)
+            if f"\"gameinfo\" \"{inGameFolder}/\"" in strip_line:
+                # We found it already in there, skip
+                break
             
-            # Replace the gameinfo entry to match the game that we are installing
-            for number, line in reversed(list(enumerate(data))):
-                strip_line = clean_line(line)
+            elif "\"gameinfo\"" in strip_line:
+                # It isn't there, remove it and add a new one to match the game
+                data.pop(number)
+                data.insert(number, f"{get_indent(line)}\"gameinfo\" \"{inGameFolder}/\"")
 
-                if f"\"gameinfo\" \"{inGameFolder}/\"" in strip_line:
-                    # We found it already in there, skip
-                    break
+                with open(path.join(gamePath, "srctools.vdf"), "w") as file:
+                    for line in data:
+                        file.write(line)
                 
-                elif "\"gameinfo\"" in strip_line:
-                    # It isn't there, remove it and add a new one to match the game
-                    data.pop(number)
-                    data.insert(number, f"{get_indent(line)}\"gameinfo\" \"{inGameFolder}/\"")
-
-                    with open(path.join(gamePath, "srctools.vdf"), "w") as file:
-                        for line in data:
-                            file.write(line)
-                    
-                    break
-
-
+                break
+    
     except Exception as error:
         msglogger(f"An error ocurred while downloading the files ({error})", "error")
         closeScript()
@@ -472,18 +514,17 @@ def downloadAddons():
 
 
 def main():
-    global inGameFolder, selectedGame, steamPath, commonPath
+    global inGameFolder, selectedGame, commonPath
 
     runsys("")  # This is required to be able to display VT100 sequences on Windows 10
     parseArgs()
-    print(f"\nTeamSpen's Hammer Addons Installer - {VERSION}\n")
+    print(f"\n\x1b[4mTeamSpen's Hammer Addons Installer - {VERSION}\x1b[24m\n")
 
     try:
         steamlibs = getSteamPath()
+
         selectedGame, steamPath = selectGame(steamlibs)
-        
-        commonPath = path.join(steamPath, "steamapps\common")
-        
+        commonPath = path.join(steamPath, "steamapps/common")
         inGameFolder = AVAILABLE_GAMES.get(selectedGame)[0]
 
         # True is enabled
