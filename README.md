@@ -15,7 +15,7 @@ Automatic installer for [TeamSpen's Hammer Addons](https://github.com/TeamSpen21
 <br>
 
 ![image](https://user-images.githubusercontent.com/48654552/121072745-e0e30a00-c7d1-11eb-9d49-beb2472b305e.png)
-![image](https://user-images.githubusercontent.com/48654552/121072873-1556c600-c7d2-11eb-805a-f39d29299e6c.png)
+![image](https://user-images.githubusercontent.com/48654552/123797890-f4702500-d8e6-11eb-8da7-e956cb9e49dd.png)
 
 <hr>
 
