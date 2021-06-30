@@ -44,19 +44,14 @@ def msglogger(string, type=None, end="\n"):
     - Types: `good, error, loading, warning`
     """
 
-    if type == "error":
-        prefix = "\x1b[91m[ E ]"
-    elif type == "good":
-        prefix = "\x1b[92m[ √ ]\x1b[0m"
-    elif type == "loading":
-        prefix = "\x1b[33m[...]"
-    elif type == "warning":
-        prefix = "\x1b[96m[ ! ]"
-    else:
-        prefix = "[   ]"
+    MSG_PREFIX = {
+        "error":    "\x1b[91m[ E ]",
+        "good":     "\x1b[92m[ √ ]\x1b[0m",
+        "loading":  "\x1b[33m[...]",
+        "warning":  "\x1b[96m[ ! ]"
+    }
     
-    print(f"\x1b[4m\x1b[9999D{prefix}\x1b[24m {string}\x1b[0m\x1b[K", end=end)
-
+    print(f"\x1b[4m\x1b[9999D{MSG_PREFIX.get(type, '[   ]')}\x1b[24m {string}\x1b[0m\x1b[K", end=end)
 
 
 
@@ -101,6 +96,7 @@ def get_indent(string) -> str:
 
 
 
+
 def stripVersion(string: str) -> str:
         """Remove any character from string which isn't a number or dot"""
 
@@ -109,9 +105,6 @@ def stripVersion(string: str) -> str:
             if char.isdigit() or char == ".":
                 ver += char
         return ver
-
-
-
 
 
 
@@ -143,12 +136,6 @@ def parseArgs():
     if args.chkup:
         checkUpdates()
         exit()
-
-
-
-
-
-
 
 
 
@@ -194,7 +181,6 @@ def getSteamPath() -> tuple:
         hkey = winreg.OpenKey(winreg.HKEY_CURRENT_USER, "SOFTWARE\Valve\Steam")
         folder = winreg.QueryValueEx(hkey, "SteamPath")[0]
         winreg.CloseKey(hkey)
-
     except Exception:
         msglogger("Couldn't find the Steam path, please specify a directory: ", "loading", "")
         folder = input()
@@ -276,7 +262,6 @@ def selectGame(steamlibs) -> tuple:
             print(f"\x1b[{len(usingGames) + 1}A\x1b[0J", end="")
             msglogger(f"Selected game '{usingGames[usrInput - 1][0]}'", "good")
             return tuple(usingGames[usrInput - 1])
-
         except (ValueError, IndexError):
             # If the value isn't valid, we move the terminal cursor up and then clear the line. This is done to not cause ugly spam when typing values
             print("\x1b[A\x1b[2K", end="")
@@ -359,9 +344,6 @@ def parseCmdSeq():
 
 
 
-
-
-
 def parseGameInfo():
     """Add the 'Game	Hammer' entry into the Gameinfo file while keeping the old contents."""
 
@@ -391,11 +373,6 @@ def parseGameInfo():
                     file.write(line)
             msglogger("Added a new entry", "good")
             break
-
-
-
-
-
 
 
 
@@ -500,7 +477,7 @@ def downloadAddons():
                         file.write(line)
                 
                 break
-    
+
     except Exception as error:
         msglogger(f"An error ocurred while downloading the files ({error})", "error")
         closeScript()
