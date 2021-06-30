@@ -13,7 +13,7 @@ from textwrap import dedent
 
 
 POSTCOMPILER_ARGS = "--propcombine $path\$file"
-VERSION = "1.4"
+VERSION = "1.4.1"
 AVAILABLE_GAMES = {
     # Game definitions. These specify the name of the main game folder, and for every game, the fgd, and the second game folder inside.
     # Game Folder: (fgdname, folder2)
@@ -133,7 +133,7 @@ def parseArgs():
     )
     argparser.add_argument("-a", "--args", help=f"Arguments for a hammer compile step. Default are '{POSTCOMPILER_ARGS}'", default=POSTCOMPILER_ARGS)
     argparser.add_argument("-g", "--game", help="The name of the game folder in which the addons will be installed.")
-    argparser.add_argument("-v", "--version", help="Select the version of HammerAddons to install. Please keep in mind that all versions might not be compatible\nwith all the games. Default value is 'latest'.", default="latest")
+    argparser.add_argument("-v", "--version", help="Select the version of HammerAddons to install. Please keep in mind that all versions\nmight not be compatible with all the games. Default value is 'latest'.", default="latest")
     argparser.add_argument("--skipCmdSeq", help="Do not modify the CmdSeq.wc file.", action="store_false")
     argparser.add_argument("--skipGameinfo", help="Do not modify the gameinfo.txt file.", action="store_false")
     argparser.add_argument("--skipDownload", help="Do not download any files.", action="store_false")
@@ -296,7 +296,7 @@ def parseCmdSeq():
     
     gameBin = path.join(commonPath, selectedGame, "bin/")
     cmdSeqPath = path.join(gameBin, "CmdSeq.wc")
-    cmdsAdded = 0
+    cmdSeqDefaultPath = path.join(gameBin, "CmdSeqDefault.wc")
 
     # Postcompiler command definition
     POSTCOMPILER_CMD = {
@@ -304,46 +304,55 @@ def parseCmdSeq():
         "args": args.args
     }
 
-    if path.isfile(cmdSeqPath):
-        with open(cmdSeqPath, "rb") as cmdfile:
-            data = cmdseq.parse(cmdfile)
-
-        # We check for the existence of the bsp command. If found, we append the postcompiler command right after it
-        for config in data:
-            foundBsp = False
-            commands = data.get(config)
-
-            for cmd in commands:
-                exeValue = getattr(cmd, "exe")
-                argValue = getattr(cmd, "args")
-                
-                if foundBsp:
-                    if "postcompiler" not in str(exeValue).lower():
-                        commands.insert(commands.index(cmd), cmdseq.Command(POSTCOMPILER_CMD["exe"], POSTCOMPILER_CMD["args"]))
-                        cmdsAdded += 1
-                    else:
-                        if args.args.lower() != str(argValue).lower():
-                            index = commands.index(cmd)
-                            commands.pop(index)
-                            commands.insert(index, cmdseq.Command(POSTCOMPILER_CMD["exe"], POSTCOMPILER_CMD["args"]))
-                            cmdsAdded += 1
-                    break
-                if exeValue == "$bsp_exe":
-                    foundBsp = True
-                    continue
-
-        if cmdsAdded == 0:
-            # No commands were added, no need to modify
-            msglogger("Found already existing commands", "warning")
+    # If the CmdSeq.wc file does not exist, we then check for the file CmdSeqDefault.wc, which has the default commands. Copy it as CmdSeq.wc
+    if not path.isfile(cmdSeqPath):
+        if path.isfile(cmdSeqDefaultPath):
+            with open(cmdSeqDefaultPath, "rb") as defCmdFile, open(cmdSeqPath, "wb") as CmdFile:
+                CmdFile.write(defCmdFile.read())
         else:
-            with open(cmdSeqPath, "wb") as cmdfile:
-                cmdseq.write(data, cmdfile)
-            
-            msglogger(f"Added {cmdsAdded} command/s successfully", "good")
+            msglogger(f"Couldn't find the 'CmdSeqDefault.wc' file in the game directory '{gameBin}'.", "error")
+            closeScript()
 
+
+
+    with open(cmdSeqPath, "rb") as cmdfile:
+        data = cmdseq.parse(cmdfile)
+
+    # We check for the existence of the bsp command. If found, we append the postcompiler command right after it
+    cmdsAdded = 0
+    for config in data:
+        foundBsp = False
+        commands = data.get(config)
+
+        for cmd in commands:
+            exeValue = getattr(cmd, "exe")
+            argValue = getattr(cmd, "args")
+            
+            if foundBsp:
+                if "postcompiler" not in str(exeValue).lower():
+                    commands.insert(commands.index(cmd), cmdseq.Command(POSTCOMPILER_CMD["exe"], POSTCOMPILER_CMD["args"]))
+                    cmdsAdded += 1
+                else:
+                    if args.args.lower() != str(argValue).lower():
+                        index = commands.index(cmd)
+                        commands.pop(index)
+                        commands.insert(index, cmdseq.Command(POSTCOMPILER_CMD["exe"], POSTCOMPILER_CMD["args"]))
+                        cmdsAdded += 1
+                break
+            if exeValue == "$bsp_exe":
+                foundBsp = True
+                continue
+
+    if cmdsAdded == 0:
+        # No commands were added, no need to modify
+        msglogger("Found already existing commands", "warning")
     else:
-        msglogger(f"Couldn't find the CmdSeq.wc file in the game '{selectedGame}'. Perhaps you forgot to launch Hammer for the first time?", "error")
-        closeScript()
+        with open(cmdSeqPath, "wb") as cmdfile:
+            cmdseq.write(data, cmdfile)
+        
+        msglogger(f"Added {cmdsAdded} command/s successfully", "good")
+
+
 
 
 
