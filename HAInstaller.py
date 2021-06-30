@@ -407,7 +407,6 @@ def downloadAddons():
         for release in data:
             tag = stripVersion(release.get("tag_name"))
             url = release.get("assets")[0].get("browser_download_url")
-
             versions[tag] = url
 
 
