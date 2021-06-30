@@ -17,7 +17,7 @@ VERSION = "1.4.1"
 AVAILABLE_GAMES = {
     # Game definitions. These specify the name of the main game folder, and for every game, the fgd, and the second game folder inside.
     # Game Folder: (fgdname, folder2)
-    
+
     "Alien Swarm": ("asw", "swarm"),
     "Black Mesa": ("bms", "blackmesa"),
     "Counter-Strike Global Offensive": ("csgo", "csgo"),
@@ -50,14 +50,14 @@ def msglogger(string, type=None, end="\n"):
         "loading":  "\x1b[33m[...]",
         "warning":  "\x1b[96m[ ! ]"
     }
-    
+
     print(f"\x1b[4m\x1b[9999D{MSG_PREFIX.get(type, '[   ]')}\x1b[24m {string}\x1b[0m\x1b[K", end=end)
 
 
 
 def checkUpdates():
     """Check if the latest version is not equal to the one that we are using"""
-    
+
     url = "https://api.github.com/repos/DarviL82/HAInstaller/releases/latest"
     msglogger("Checking for new versions", "loading")
 
@@ -68,7 +68,7 @@ def checkUpdates():
     except Exception:
         msglogger("An error ocurred while checking for updates", "error")
         closeScript()
-    
+
     if version != VERSION:
         msglogger(f"There is a new version available.\n\tUsing: {VERSION}\n\tLatest: {version}", "warning")
     else:
@@ -111,7 +111,7 @@ def stripVersion(string: str) -> str:
 
 def parseArgs():
     """Parse the arguments passed to the script"""
-    
+
     global args
     argparser = argparse.ArgumentParser(
         epilog=dedent(f"""\
@@ -217,7 +217,7 @@ def getSteamPath() -> tuple:
 def selectGame(steamlibs) -> tuple:
     """
     Let the user select one of their games.
-    
+
     Returns a tuple containing the name of the game, and the location of the library that it belongs to.
     """
 
@@ -228,12 +228,12 @@ def selectGame(steamlibs) -> tuple:
         for game in listdir(common):
             if game in AVAILABLE_GAMES:
                 usingGames.append((game, lib))
-    
+
     if len(usingGames) == 0:
         # No supported games found, quitting
         msglogger("Couldn't find any game supported by HammerAddons", "error")
         closeScript()
-    
+
     if args.game:
         # Check the string passed from the game argument
         if args.game in AVAILABLE_GAMES:
@@ -241,12 +241,12 @@ def selectGame(steamlibs) -> tuple:
                 if args.game == game:
                     msglogger(f"Selected game '{args.game}'", "good")
                     return tuple((args.game, lib))
-            
+
             msglogger(f"The game '{args.game}' is not installed", "error")
         else:
             msglogger(f"The game '{args.game}' is not supported", "error")
-        
-    
+
+
     # Print a simple select menu with all the available choices
     msglogger("Select a game to install HammerAddons", "loading")
     for number, game in enumerate(usingGames):
@@ -257,7 +257,7 @@ def selectGame(steamlibs) -> tuple:
             usrInput = int(input())
             if usrInput not in range(1, len(usingGames) + 1):
                 raise ValueError
-            
+
             # The value is correct, so we move the cursor up the same number of lines taken by the menu to drawn, so then we can override it
             print(f"\x1b[{len(usingGames) + 1}A\x1b[0J", end="")
             msglogger(f"Selected game '{usingGames[usrInput - 1][0]}'", "good")
@@ -278,7 +278,7 @@ def parseCmdSeq():
     """Read the user's CmdSeq.wc file, and add the postcompiler commands to it. This will also check if there's already a postcompiler command being used."""
 
     msglogger("Adding postcompiler compile commands", "loading")
-    
+
     gameBin = path.join(commonPath, selectedGame, "bin/")
     cmdSeqPath = path.join(gameBin, "CmdSeq.wc")
     cmdSeqDefaultPath = path.join(gameBin, "CmdSeqDefault.wc")
@@ -312,7 +312,7 @@ def parseCmdSeq():
         for cmd in commands:
             exeValue = getattr(cmd, "exe")
             argValue = getattr(cmd, "args")
-            
+
             if foundBsp:
                 if "postcompiler" not in str(exeValue).lower():
                     commands.insert(commands.index(cmd), cmdseq.Command(POSTCOMPILER_CMD["exe"], POSTCOMPILER_CMD["args"]))
@@ -334,7 +334,7 @@ def parseCmdSeq():
     else:
         with open(cmdSeqPath, "wb") as cmdfile:
             cmdseq.write(data, cmdfile)
-        
+
         msglogger(f"Added {cmdsAdded} command/s successfully", "good")
 
 
@@ -349,14 +349,14 @@ def parseGameInfo():
 
     msglogger("Checking GameInfo.txt", "loading")
     gameInfoPath = path.join(commonPath, selectedGame, inGameFolder, "gameinfo.txt")
-    
+
     if not path.exists(gameInfoPath):
         msglogger(f"Couldn't find the file '{gameInfoPath}'", "error")
         closeScript()
 
     with open(gameInfoPath, encoding="utf8") as file:
         data = list(file)
-    
+
     for number, line in reversed(list(enumerate(data))):
         strip_line = clean_line(line)
 
@@ -364,7 +364,7 @@ def parseGameInfo():
             # Hammer is already in there, skip
             msglogger("No need to modify", "warning")
             break
-        
+
         elif "|gameinfo_path|" in strip_line:
             # Append Game Hammer right after the |gameinfo_path| entry
             data.insert(number + 1, f"{get_indent(line)}Game\tHammer\n")
@@ -383,7 +383,7 @@ def parseGameInfo():
 
 def downloadAddons():
     """Download and unzip all necessary files."""
-    
+
     gamePath = path.join(commonPath, selectedGame)
     releasesUrl = "https://api.github.com/repos/TeamSpen210/HammerAddons/releases"
     vdfUrl = "https://raw.githubusercontent.com/DarviL82/HAInstaller/main/resources/srctools.vdf"
@@ -392,12 +392,12 @@ def downloadAddons():
     def getZipUrl(ver) -> str:
         """
         Return a tuple with the version tag, and the url of the zip download page from the version specified. (`(verTag, zipUrl)`)
-        
+
         - `ver` is a string containing a version value, or `latest`.
         """
 
         verS = stripVersion(ver)
-    
+
         with request.urlopen(releasesUrl) as data:
             data = jsonLoads(data.read())
 
@@ -422,11 +422,11 @@ def downloadAddons():
             errorMsg = ""
             for x in tuple(versions.keys()):
                 errorMsg += f"'{x}', "
-            
+
             msglogger(f"Version '{ver}' does not exist, available versions: {errorMsg}\x1b[2D.\x1b[K", "error")
             closeScript()
 
-     
+
 
     try:
         version, zipUrl = getZipUrl(args.version)
@@ -448,17 +448,17 @@ def downloadAddons():
 
                 # Extract the FGD file to the bin folder
                 zipfile.extract(f"{AVAILABLE_GAMES.get(selectedGame)[1]}.fgd", path.join(gamePath, "bin/"))
-        
+
 
         # Download srctools.vdf, so we can modify it to have the correct game folder inside.
         if not path.exists(path.join(gamePath, "srctools.vdf")):
             with request.urlopen(vdfUrl) as data:
                 with open(path.join(gamePath, "srctools.vdf"), "wb") as file:
                     file.write(data.read())
-            
+
         with open(path.join(gamePath, "srctools.vdf")) as file:
             data = list(file)
-        
+
         # Replace the gameinfo entry to match the game that we are installing
         for number, line in reversed(list(enumerate(data))):
             strip_line = clean_line(line)
@@ -466,7 +466,7 @@ def downloadAddons():
             if f"\"gameinfo\" \"{inGameFolder}/\"" in strip_line:
                 # We found it already in there, skip
                 break
-            
+
             elif "\"gameinfo\"" in strip_line:
                 # It isn't there, remove it and add a new one to match the game
                 data.pop(number)
@@ -475,13 +475,13 @@ def downloadAddons():
                 with open(path.join(gamePath, "srctools.vdf"), "w") as file:
                     for line in data:
                         file.write(line)
-                
+
                 break
 
     except Exception as error:
         msglogger(f"An error ocurred while downloading the files ({error})", "error")
         closeScript()
-    
+
     msglogger("Downloaded all files!", "good")
 
 
@@ -521,7 +521,7 @@ def main():
     except KeyboardInterrupt:
         msglogger("Installation interrupted", "error")
         closeScript()
-    
+
     msglogger(f"Finished installing HammerAddons for '{selectedGame}'!", "good")
     closeScript()
 
