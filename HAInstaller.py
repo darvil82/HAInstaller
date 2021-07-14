@@ -1,19 +1,20 @@
 import winreg
-from os import path, listdir, system as runsys
+import argparse
+from os import close, path, listdir, system as runsys, environ
 from srctools import cmdseq, clean_line, Property
 from tempfile import TemporaryFile
 from urllib import request
 from json import loads as jsonLoads
 from zipfile import ZipFile
 from sys import exit
-import argparse
 from textwrap import dedent
+from time import sleep
 
 
 
 
 POSTCOMPILER_ARGS = "--propcombine $path\$file"
-VERSION = "1.4.1"
+VERSION = "1.5"
 AVAILABLE_GAMES = {
     # Game definitions. These specify the name of the main game folder, and for every game, the fgd, and the second game folder inside.
     # Game Folder: (fgdname, folder2)
@@ -38,7 +39,7 @@ AVAILABLE_GAMES = {
 
 
 
-def msglogger(string, type=None, end="\n"):
+def msglogger(string, type: str = None, end: str = "\n", blink: bool = False):
     """
     Print a message out on the terminal.
     - Types: `good, error, loading, warning`
@@ -46,12 +47,19 @@ def msglogger(string, type=None, end="\n"):
 
     MSG_PREFIX = {
         "error":    "\x1b[91m[ E ]",
-        "good":     "\x1b[92m[ √ ]\x1b[0m",
+        "good":     "\x1b[92m[ √ ]\x1b[97m",
         "loading":  "\x1b[33m[...]",
         "warning":  "\x1b[96m[ ! ]"
     }
 
-    print(f"\x1b[4m\x1b[9999D{MSG_PREFIX.get(type, '[   ]')}\x1b[24m {string}\x1b[0m\x1b[K", end=end)
+    msg = f"\x1b[4m\x1b[9999D{MSG_PREFIX.get(type, '[   ]')}\x1b[24m {string}\x1b[0m\x1b[K"
+    if blink:
+        print(f"\x1b[7m{msg}\x1b[27m", end=end)
+        sleep(0.25)
+        print(f"\x1b[A{msg}", end=end)
+    else:
+        print(msg, end=end)
+
 
 
 
@@ -109,6 +117,17 @@ def stripVersion(string: str) -> str:
 
 
 
+def isProcess(process: str) -> bool:
+    """Checks if the process name given is running"""
+
+    tempFile = f"{environ['TEMP']}\\ha"
+    runsys(f"tasklist /FI \"IMAGENAME eq {process}\" > {tempFile}")
+    with open(tempFile) as f:
+        if len(tuple(f)) > 2: return True
+
+
+
+
 def parseArgs():
     """Parse the arguments passed to the script"""
 
@@ -127,9 +146,10 @@ def parseArgs():
     argparser.add_argument("-a", "--args", help=f"Arguments for a hammer compile step. Default are '{POSTCOMPILER_ARGS}'", default=POSTCOMPILER_ARGS)
     argparser.add_argument("-g", "--game", help="The name of the game folder in which the addons will be installed.")
     argparser.add_argument("-v", "--version", help="Select the version of HammerAddons to install. Please keep in mind that all versions\nmight not be compatible with all the games. Default value is 'latest'.", default="latest")
-    argparser.add_argument("--skipCmdSeq", help="Do not modify the CmdSeq.wc file.", action="store_false")
-    argparser.add_argument("--skipGameinfo", help="Do not modify the gameinfo.txt file.", action="store_false")
-    argparser.add_argument("--skipDownload", help="Do not download any files.", action="store_false")
+    argparser.add_argument("--skipCmdSeq", help="Do not modify the CmdSeq.wc file.", action="store_true")
+    argparser.add_argument("--skipGameinfo", help="Do not modify the gameinfo.txt file.", action="store_true")
+    argparser.add_argument("--skipDownload", help="Do not download any files.", action="store_true")
+    argparser.add_argument("--ignoreHammer", help="Do not check if Hammer is running.", action="store_true")
     argparser.add_argument("--chkup", help="Check for new versions of the installer.", action="store_true")
     args = argparser.parse_args()
 
@@ -227,7 +247,8 @@ def selectGame(steamlibs) -> tuple:
         common = path.join(lib, "steamapps/common")
         for game in listdir(common):
             if game in AVAILABLE_GAMES:
-                usingGames.append((game, lib))
+                if path.exists(path.join(common, game, AVAILABLE_GAMES.get(game)[0], "gameinfo.txt")):
+                    usingGames.append((game, lib))
 
     if len(usingGames) == 0:
         # No supported games found, quitting
@@ -265,7 +286,6 @@ def selectGame(steamlibs) -> tuple:
         except (ValueError, IndexError):
             # If the value isn't valid, we move the terminal cursor up and then clear the line. This is done to not cause ugly spam when typing values
             print("\x1b[A\x1b[2K", end="")
-            pass
 
 
 
@@ -309,17 +329,16 @@ def parseCmdSeq():
         foundBsp = False
         commands = data.get(config)
 
-        for cmd in commands:
-            exeValue = getattr(cmd, "exe")
-            argValue = getattr(cmd, "args")
+        for index, cmd in enumerate(commands):
+            exeValue = getattr(cmd, "exe").lower()
+            argValue = getattr(cmd, "args").lower()
 
             if foundBsp:
-                if "postcompiler" not in str(exeValue).lower():
-                    commands.insert(commands.index(cmd), cmdseq.Command(POSTCOMPILER_CMD["exe"], POSTCOMPILER_CMD["args"]))
+                if "postcompiler" not in exeValue:
+                    commands.insert(index, cmdseq.Command(POSTCOMPILER_CMD["exe"], POSTCOMPILER_CMD["args"]))
                     cmdsAdded += 1
                 else:
-                    if args.args.lower() != str(argValue).lower():
-                        index = commands.index(cmd)
+                    if POSTCOMPILER_CMD["args"] != argValue:
                         commands.pop(index)
                         commands.insert(index, cmdseq.Command(POSTCOMPILER_CMD["exe"], POSTCOMPILER_CMD["args"]))
                         cmdsAdded += 1
@@ -418,11 +437,7 @@ def downloadAddons():
             return (verS, versions[verS])
         else:
             # We didn't succeed, generate an error message and exit
-            errorMsg = ""
-            for x in tuple(versions.keys()):
-                errorMsg += f"'{x}', "
-
-            msglogger(f"Version '{ver}' does not exist, available versions: {errorMsg}\x1b[2D.\x1b[K", "error")
+            msglogger(f"Version '{ver}' does not exist, available versions: {', '.join(versions.keys())}.", "error")
             closeScript()
 
 
@@ -442,7 +457,7 @@ def downloadAddons():
                         zipfile.extract(file, path.join(gamePath, "bin/"))
                     elif file.startswith("hammer/"):
                         zipfile.extract(file, gamePath)
-                    elif file.startswith(f"instances/{inGameFolder}"):
+                    elif file.startswith(f"instances/{inGameFolder}/"):
                         zipfile.extract(file, path.join(gamePath, "sdk_content/maps/"))
 
                 # Extract the FGD file to the bin folder
@@ -512,16 +527,22 @@ def main():
         commonPath = path.join(steamPath, "steamapps/common")
         inGameFolder = AVAILABLE_GAMES.get(selectedGame)[0]
 
-        # True is enabled
-        if args.skipCmdSeq: parseCmdSeq()
-        if args.skipGameinfo: parseGameInfo()
-        if args.skipDownload: downloadAddons()
+        if not args.ignoreHammer:
+            # We check continuosly if Hammer is open. Once it is closed, we continue.
+            while isProcess("hammer.exe"):
+                msglogger("Hammer is running, please close it before continuing. Press any key to retry.", "error", blink=True)
+                runsys("pause > nul")
+                print("\x1b[A\x1b[2K", end="")
+
+        if not args.skipCmdSeq: parseCmdSeq()
+        if not args.skipGameinfo: parseGameInfo()
+        if not args.skipDownload: downloadAddons()
 
     except KeyboardInterrupt:
         msglogger("Installation interrupted", "error")
         closeScript()
 
-    msglogger(f"Finished installing HammerAddons for '{selectedGame}'!", "good")
+    msglogger(f"Finished installing HammerAddons for '{selectedGame}'!", "good", blink=True)
     closeScript()
 
 
