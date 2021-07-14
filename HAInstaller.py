@@ -92,7 +92,7 @@ def closeScript():
 
 
 
-def get_indent(string) -> str:
+def get_indent(string: str) -> str:
     """Return indentation from supplied string"""
 
     indent = ""
@@ -234,7 +234,7 @@ def getSteamPath() -> tuple:
 
 
 
-def selectGame(steamlibs) -> tuple:
+def selectGame(steamlibs: tuple) -> tuple:
     """
     Let the user select one of their games.
 
@@ -408,7 +408,7 @@ def downloadAddons():
     vdfUrl = "https://raw.githubusercontent.com/DarviL82/HAInstaller/main/resources/srctools.vdf"
 
 
-    def getZipUrl(ver) -> str:
+    def getZipUrl(ver: str) -> str:
         """
         Return a tuple with the version tag, and the url of the zip download page from the version specified. (`(verTag, zipUrl)`)
 
