@@ -15,7 +15,30 @@ Automatic installer for [TeamSpen's Hammer Addons](https://github.com/TeamSpen21
 <br>
 
 ![image](https://user-images.githubusercontent.com/48654552/121072745-e0e30a00-c7d1-11eb-9d49-beb2472b305e.png)
-![image](https://user-images.githubusercontent.com/48654552/123797890-f4702500-d8e6-11eb-8da7-e956cb9e49dd.png)
+
+```
+usage: HAInstaller.py [-h] [-a ARGS] [-g GAME] [-v VERSION] [--skipCmdSeq] [--skipGameinfo] [--skipDownload] [--ignoreHammer]
+                      [--chkup]
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -a ARGS, --args ARGS  Arguments for a hammer compile step. Default are '--propcombine $path\$file'
+  -g GAME, --game GAME  The name of the game folder in which the addons will be installed.
+  -v VERSION, --version VERSION
+                        Select the version of HammerAddons to install. Please keep in mind that all versions
+                        might not be compatible with all the games. Default value is 'latest'.
+  --skipCmdSeq          Do not modify the CmdSeq.wc file.
+  --skipGameinfo        Do not modify the gameinfo.txt file.
+  --skipDownload        Do not download any files.
+  --ignoreHammer        Do not check if Hammer is running.
+  --chkup               Check for new versions of the installer.
+
+Using version 1.5
+
+Repositories:
+    HAInstaller:    https://github.com/DarviL82/HAInstaller
+    HammerAddons:   https://github.com/TeamSpen210/HammerAddons
+```
 
 <hr>
 
