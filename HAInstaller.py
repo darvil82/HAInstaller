@@ -137,7 +137,7 @@ def parseArgs():
             Using version {VERSION}
 
             Repositories:
-                HAInstaller:    \x1b[4mhttps://github.com/L89David/HAInstaller\x1b[24m
+                HAInstaller:    \x1b[4mhttps://github.com/DarviL82/HAInstaller\x1b[24m
                 HammerAddons:   \x1b[4mhttps://github.com/TeamSpen210/HammerAddons\x1b[24m
             """
         ),
