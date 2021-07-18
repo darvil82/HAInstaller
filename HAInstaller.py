@@ -17,7 +17,7 @@ POSTCOMPILER_ARGS = "--propcombine $path\$file"
 VERSION = "1.5"
 AVAILABLE_GAMES = {
     # Game definitions. These specify the name of the main game folder, and for every game, the fgd, and the second game folder inside.
-    # Game Folder: (fgdname, folder2)
+    # Game Folder: (folder2, fgdname)
 
     "Alien Swarm": ("asw", "swarm"),
     "Black Mesa": ("bms", "blackmesa"),
