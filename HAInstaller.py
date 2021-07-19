@@ -118,12 +118,16 @@ def stripVersion(string: str) -> str:
 
 
 def isProcess(process: str) -> bool:
-    """Checks if the process name given is running"""
+    """Checks if the process name given is running. String must contain the name of the program to find, including extension."""
 
     tempFile = f"{environ['TEMP']}\\ha"
+
     runsys(f"tasklist /FI \"IMAGENAME eq {process}\" > {tempFile}")
     with open(tempFile) as f:
-        if len(tuple(f)) > 2: return True
+        if process in f.read():
+            return True
+        else:
+            return False
 
 
 
