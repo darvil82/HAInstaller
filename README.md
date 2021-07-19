@@ -14,7 +14,7 @@ Automatic installer for [TeamSpen's Hammer Addons](https://github.com/TeamSpen21
 
 <br>
 
-![2021-07-19 16-59-13](https://user-images.githubusercontent.com/48654552/126181869-163ab1bf-1774-475a-bafe-199380f38926.gif)
+![HAInstaller](https://user-images.githubusercontent.com/48654552/126181869-163ab1bf-1774-475a-bafe-199380f38926.gif)
 
 ```
 usage: HAInstaller.py [-h] [-a ARGS] [-g GAME] [-v VERSION] [--skipCmdSeq] [--skipGameinfo] [--skipDownload] [--ignoreHammer]
