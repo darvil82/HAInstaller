@@ -1,6 +1,6 @@
 import winreg
 import argparse
-from os import close, path, listdir, system as runsys, environ
+from os import path, listdir, system as runsys, environ
 from srctools import cmdseq, clean_line, Property
 from tempfile import TemporaryFile
 from urllib import request
@@ -14,7 +14,7 @@ from time import sleep
 
 
 POSTCOMPILER_ARGS = "--propcombine $path\$file"
-VERSION = "1.5.1"
+VERSION = "1.5.1-1"
 AVAILABLE_GAMES = {
     # Game definitions. These specify the name of the main game folder, and for every game, the fgd, and the second game folder inside.
     # Game Folder: (folder2, fgdname)
@@ -334,17 +334,20 @@ def parseCmdSeq():
         commands = data.get(config)
 
         for index, cmd in enumerate(commands):
+            exeValue = str(cmd.exe).lower()
+            argValue = str(cmd.args).lower()
+
             if foundBsp:
-                if "postcompiler" not in cmd.exe:
+                if "postcompiler" not in exeValue:
                     commands.insert(index, cmdseq.Command(POSTCOMPILER_CMD["exe"], POSTCOMPILER_CMD["args"]))
                     cmdsAdded += 1
                 else:
-                    if POSTCOMPILER_CMD["args"] != cmd.args:
+                    if POSTCOMPILER_CMD["args"] != argValue:
                         commands.pop(index)
                         commands.insert(index, cmdseq.Command(POSTCOMPILER_CMD["exe"], POSTCOMPILER_CMD["args"]))
                         cmdsAdded += 1
                 break
-            if cmd.exe == "$bsp_exe":
+            if exeValue == "$bsp_exe":
                 foundBsp = True
                 continue
 
