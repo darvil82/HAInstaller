@@ -310,7 +310,7 @@ def parseCmdSeq():
     # Postcompiler command definition
     POSTCOMPILER_CMD = {
         "exe": path.join(gameBin, "postcompiler/postcompiler.exe"),
-        "args": args.args
+        "args": args.args.lower()
     }
 
     # If the CmdSeq.wc file does not exist, we then check for the file CmdSeqDefault.wc, which has the default commands. Copy it as CmdSeq.wc
@@ -334,20 +334,17 @@ def parseCmdSeq():
         commands = data.get(config)
 
         for index, cmd in enumerate(commands):
-            exeValue = getattr(cmd, "exe").lower()
-            argValue = getattr(cmd, "args").lower()
-
             if foundBsp:
-                if "postcompiler" not in exeValue:
+                if "postcompiler" not in cmd.exe:
                     commands.insert(index, cmdseq.Command(POSTCOMPILER_CMD["exe"], POSTCOMPILER_CMD["args"]))
                     cmdsAdded += 1
                 else:
-                    if POSTCOMPILER_CMD["args"] != argValue:
+                    if POSTCOMPILER_CMD["args"] != cmd.args:
                         commands.pop(index)
                         commands.insert(index, cmdseq.Command(POSTCOMPILER_CMD["exe"], POSTCOMPILER_CMD["args"]))
                         cmdsAdded += 1
                 break
-            if exeValue == "$bsp_exe":
+            if cmd.exe == "$bsp_exe":
                 foundBsp = True
                 continue
 
