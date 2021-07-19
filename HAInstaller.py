@@ -438,7 +438,7 @@ def downloadAddons():
             return (verS, versions[verS])
         else:
             # We didn't succeed, generate an error message and exit
-            msglogger(f"Version '{ver}' does not exist, available versions: {', '.join(versions.keys())}.", "error")
+            msglogger(f"Version '{ver}' does not exist, available versions: '" + "', '".join(versions.keys()) + "'.", "error")
             closeScript()
 
 
