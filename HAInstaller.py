@@ -39,10 +39,10 @@ AVAILABLE_GAMES = {
 
 
 
-def msglogger(string, type: str = None, end: str = "\n", blink: bool = False):
+def msglogger(string, type: str = None, blink: bool = False, end: str = "\n"):
     """
     Print a message out on the terminal.
-    - Types: `good, error, loading, warning`
+        - Types: `good, error, loading, warning`
     """
 
     MSG_PREFIX = {
@@ -78,7 +78,7 @@ def checkUpdates():
         closeScript()
 
     if version != VERSION:
-        msglogger(f"There is a new version available.\n\tUsing: {VERSION}\n\tLatest: {version}", "warning")
+        msglogger(f"There is a new version available.\n\tUsing:\t{VERSION}\n\tLatest:\t{version}", "warning")
     else:
         msglogger("Using latest version", "good")
 
@@ -206,12 +206,12 @@ def getSteamPath() -> tuple:
         folder = winreg.QueryValueEx(hkey, "SteamPath")[0]
         winreg.CloseKey(hkey)
     except Exception:
-        msglogger("Couldn't find the Steam path, please specify a directory: ", "loading", "")
+        msglogger("Couldn't find the Steam path, please specify a directory: ", "loading", end="")
         folder = input()
 
     # Continue asking for path until it is valid
     while not checkPath(folder):
-        msglogger("Try again: ", "loading", "")
+        msglogger("Try again: ", "loading", end="")
         folder = input()
 
 
@@ -444,6 +444,8 @@ def downloadAddons():
 
 
     try:
+        msglogger(f"Looking up for {args.version} version", "loading")
+
         version, zipUrl = getZipUrl(args.version)
 
         msglogger(f"Downloading required files of version {version}", "loading")
@@ -497,7 +499,7 @@ def downloadAddons():
         msglogger(f"An error ocurred while downloading the files ({error})", "error")
         closeScript()
 
-    msglogger("Downloaded all files!", "good")
+    msglogger("Downloaded all files", "good")
 
 
 
@@ -518,8 +520,8 @@ def main():
     global inGameFolder, selectedGame, commonPath
 
     runsys("")  # This is required to be able to display VT100 sequences on Windows 10
+    print(f"\n\x1b[97m\x1b[4mTeamSpen's Hammer Addons Installer - v{VERSION}\x1b[0m\n")
     parseArgs()
-    print(f"\n\x1b[4mTeamSpen's Hammer Addons Installer - {VERSION}\x1b[24m\n")
 
     try:
         steamlibs = getSteamPath()
@@ -543,7 +545,7 @@ def main():
         msglogger("Installation interrupted", "error")
         closeScript()
 
-    msglogger(f"Finished installing HammerAddons for '{selectedGame}'!", "good", blink=True)
+    msglogger(f"Finished installing HammerAddons for {selectedGame}!", "good", blink=True)
     closeScript()
 
 
