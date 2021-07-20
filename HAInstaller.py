@@ -14,7 +14,7 @@ from time import sleep
 
 
 POSTCOMPILER_ARGS = "--propcombine $path\$file"
-VERSION = "1.5.1-1"
+VERSION = "1.5.1-2"
 AVAILABLE_GAMES = {
     # Game definitions. These specify the name of the main game folder, and for every game, the fgd, and the second game folder inside.
     # Game Folder: (folder2, fgdname)
@@ -97,20 +97,19 @@ def get_indent(string: str) -> str:
 
     indent = ""
     for x in string:
-        if x in {" ", "\t"}:
+        if x in " \t":
             indent += x
         else:
             return indent
 
 
 
-
 def stripVersion(string: str) -> str:
-        """Remove any character from string which isn't a number or dot"""
+        """Remove any character from string which isn't a number, dot, or -"""
 
         ver = ""
         for char in string:
-            if char.isdigit() or char == ".":
+            if char.isdigit() or char in ".-":
                 ver += char
         return ver
 
@@ -381,9 +380,9 @@ def parseGameInfo():
         data = list(file)
 
     for number, line in reversed(list(enumerate(data))):
-        strip_line = clean_line(line)
+        strip_line = clean_line(line).lower()
 
-        if "game" in strip_line.lower() and "hammer" in strip_line.lower():
+        if all(item in strip_line for item in {"game", "hammer"}):
             # Hammer is already in there, skip
             msglogger("No need to modify", "warning")
             break
@@ -481,22 +480,22 @@ def downloadAddons():
 
         # Replace the gameinfo entry to match the game that we are installing
         for number, line in reversed(list(enumerate(data))):
-            strip_line = clean_line(line)
+            strip_line = clean_line(line).lower()
 
-            if f"\"gameinfo\" \"{inGameFolder}/\"" in strip_line:
-                # We found it already in there, skip
-                break
+            if "\"gameinfo\"" in strip_line:
+                if f"\"{inGameFolder}/\"" in strip_line:
+                    # We found it already in there, skip
+                    break
 
-            elif "\"gameinfo\"" in strip_line:
-                # It isn't there, remove it and add a new one to match the game
-                data.pop(number)
-                data.insert(number, f"{get_indent(line)}\"gameinfo\" \"{inGameFolder}/\"")
+                else:
+                    # It isn't there, remove it and add a new one to match the game
+                    data.pop(number)
+                    data.insert(number, f"{get_indent(line)}\"gameinfo\" \"{inGameFolder}/\"\n")
 
-                with open(path.join(gamePath, "srctools.vdf"), "w") as file:
-                    for line in data:
-                        file.write(line)
-
-                break
+                    with open(path.join(gamePath, "srctools.vdf"), "w") as file:
+                        for line in data:
+                            file.write(line)
+                    break
 
     except Exception as error:
         msglogger(f"An error ocurred while downloading the files ({error})", "error")
