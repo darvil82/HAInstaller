@@ -92,7 +92,7 @@ def closeScript():
 
 
 
-def get_indent(string: str) -> str:
+def getIndent(string: str) -> str:
     """Return indentation from supplied string"""
 
     indent = ""
@@ -385,7 +385,7 @@ def parseGameInfo():
 
         elif "|gameinfo_path|" in strip_line:
             # Append Game Hammer right after the |gameinfo_path| entry
-            data.insert(number + 1, f"{get_indent(line)}Game\tHammer\n")
+            data.insert(number + 1, f"{getIndent(line)}Game\tHammer\n")
             with open(gameInfoPath, "w") as file:
                 for line in data:
                     file.write(line)
@@ -486,7 +486,7 @@ def downloadAddons():
                 else:
                     # It isn't there, remove it and add a new one to match the game
                     data.pop(number)
-                    data.insert(number, f"{get_indent(line)}\"gameinfo\" \"{inGameFolder}/\"\n")
+                    data.insert(number, f"{getIndent(line)}\"gameinfo\" \"{inGameFolder}/\"\n")
 
                     with open(path.join(gamePath, "srctools.vdf"), "w") as file:
                         for line in data:
