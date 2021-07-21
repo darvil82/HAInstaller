@@ -39,7 +39,7 @@ AVAILABLE_GAMES = {
 
 
 
-def msglogger(string, type: str = None, blink: bool = False, end: str = "\n"):
+def msglogger(*values: object, type: str = None, blink: bool = False, end: str = "\n"):
     """
     Print a message out on the terminal.
         - Types: `good, error, loading, warning`
@@ -52,13 +52,13 @@ def msglogger(string, type: str = None, blink: bool = False, end: str = "\n"):
         "warning":  "\x1b[96m[ ! ]"
     }
 
-    msg = f"\x1b[4m\x1b[9999D{MSG_PREFIX.get(type, '[   ]')}\x1b[24m {string}\x1b[0m\x1b[K"
+    msg = f"\x1b[9999D\x1b[4m{MSG_PREFIX.get(type, '[   ]')}\x1b[24m {' '.join(str(item) for item in values)}\x1b[0m\x1b[K"
+
     if blink:
-        print(f"\x1b[7m{msg}\x1b[27m", end=end)
+        print(f"\x1b[7m{msg}\x1b[27m", end="", flush=True)
         sleep(0.25)
-        print(f"\x1b[A{msg}", end=end)
-    else:
-        print(msg, end=end)
+
+    print(msg, end=end)
 
 
 
@@ -67,20 +67,20 @@ def checkUpdates():
     """Check if the latest version is not equal to the one that we are using"""
 
     url = "https://api.github.com/repos/DarviL82/HAInstaller/releases/latest"
-    msglogger("Checking for new versions", "loading")
+    msglogger("Checking for new versions", type="loading")
 
     try:
         with request.urlopen(url) as data:
             release = jsonLoads(data.read())
             version = stripVersion(release.get("tag_name"))
     except Exception:
-        msglogger("An error ocurred while checking for updates", "error")
+        msglogger("An error ocurred while checking for updates", type="error")
         closeScript()
 
     if version != VERSION:
-        msglogger(f"There is a new version available.\n\tUsing:\t{VERSION}\n\tLatest:\t{version}", "warning")
+        msglogger(f"There is a new version available.\n\tUsing:\t{VERSION}\n\tLatest:\t{version}", type="warning")
     else:
-        msglogger("Using latest version", "good")
+        msglogger("Using latest version", type="good")
 
 
 
@@ -189,10 +189,10 @@ def getSteamPath() -> tuple:
             if all(item in listdir(foldername) for item in STEAM_CONTENTS):
                 return True
             else:
-                msglogger(f"The directory '{foldername}' isn't a valid Steam directory.", "error")
+                msglogger(f"The directory '{foldername}' isn't a valid Steam directory.", type="error")
                 return False
         else:
-            msglogger(f"The directory '{foldername}' does not exist.", "error")
+            msglogger(f"The directory '{foldername}' does not exist.", type="error")
 
 
     try:
@@ -201,12 +201,12 @@ def getSteamPath() -> tuple:
         folder = winreg.QueryValueEx(hkey, "SteamPath")[0]
         winreg.CloseKey(hkey)
     except Exception:
-        msglogger("Couldn't find the Steam path, please specify a directory: ", "loading", end="")
+        msglogger("Couldn't find the Steam path, please specify a directory: ", type="loading", end="")
         folder = input()
 
     # Continue asking for path until it is valid
     while not checkPath(folder):
-        msglogger("Try again: ", "loading", end="")
+        msglogger("Try again: ", type="loading", end="")
         folder = input()
 
 
@@ -223,7 +223,7 @@ def getSteamPath() -> tuple:
             if prop.name.isdigit():
                 steamlibs.append(prop.value)
 
-    msglogger(f"Got Steam path '{folder}'", "good")
+    msglogger(f"Got Steam path '{folder}'", type="good")
     return tuple(steamlibs)
 
 
@@ -251,7 +251,7 @@ def selectGame(steamlibs: tuple) -> tuple:
 
     if len(usingGames) == 0:
         # No supported games found, quitting
-        msglogger("Couldn't find any game supported by HammerAddons", "error")
+        msglogger("Couldn't find any game supported by HammerAddons", type="error")
         closeScript()
 
     if args.game:
@@ -259,16 +259,16 @@ def selectGame(steamlibs: tuple) -> tuple:
         if args.game in AVAILABLE_GAMES:
             for game, lib in usingGames:
                 if args.game == game:
-                    msglogger(f"Selected game '{args.game}'", "good")
+                    msglogger(f"Selected game '{args.game}'", type="good")
                     return tuple((args.game, lib))
 
-            msglogger(f"The game '{args.game}' is not installed", "error")
+            msglogger(f"The game '{args.game}' is not installed", type="error")
         else:
-            msglogger(f"The game '{args.game}' is not supported", "error")
+            msglogger(f"The game '{args.game}' is not supported", type="error")
 
 
     # Print a simple select menu with all the available choices
-    msglogger("Select a game to install HammerAddons", "loading")
+    msglogger("Select a game to install HammerAddons", type="loading")
     for number, game in enumerate(usingGames):
         print(f"\t{number + 1}: {game[0]}")
 
@@ -280,7 +280,7 @@ def selectGame(steamlibs: tuple) -> tuple:
 
             # The value is correct, so we move the cursor up the same number of lines taken by the menu to drawn, so then we can override it
             print(f"\x1b[{len(usingGames) + 1}A\x1b[0J", end="")
-            msglogger(f"Selected game '{usingGames[usrInput - 1][0]}'", "good")
+            msglogger(f"Selected game '{usingGames[usrInput - 1][0]}'", type="good")
             return tuple(usingGames[usrInput - 1])
         except (ValueError, IndexError):
             # If the value isn't valid, we move the terminal cursor up and then clear the line. This is done to not cause ugly spam when typing values
@@ -296,7 +296,7 @@ def selectGame(steamlibs: tuple) -> tuple:
 def parseCmdSeq():
     """Read the user's CmdSeq.wc file, and add the postcompiler commands to it. This will also check if there's already a postcompiler command being used."""
 
-    msglogger("Adding postcompiler compile commands", "loading")
+    msglogger("Adding postcompiler compile commands", type="loading")
 
     gameBin = path.join(commonPath, selectedGame, "bin/")
     cmdSeqPath = path.join(gameBin, "CmdSeq.wc")
@@ -314,7 +314,7 @@ def parseCmdSeq():
             with open(cmdSeqDefaultPath, "rb") as defCmdFile, open(cmdSeqPath, "wb") as CmdFile:
                 CmdFile.write(defCmdFile.read())
         else:
-            msglogger(f"Couldn't find the 'CmdSeqDefault.wc' file in the game directory '{gameBin}'.", "error")
+            msglogger(f"Couldn't find the 'CmdSeqDefault.wc' file in the game directory '{gameBin}'.", type="error")
             closeScript()
 
 
@@ -348,12 +348,12 @@ def parseCmdSeq():
 
     if cmdsAdded == 0:
         # No commands were added, no need to modify
-        msglogger("Found already existing commands", "warning")
+        msglogger("Found already existing commands", type="warning")
     else:
         with open(cmdSeqPath, "wb") as cmdfile:
             cmdseq.write(data, cmdfile)
 
-        msglogger(f"Added {cmdsAdded} command/s successfully", "good")
+        msglogger(f"Added {cmdsAdded} command/s successfully", type="good")
 
 
 
@@ -365,11 +365,11 @@ def parseCmdSeq():
 def parseGameInfo():
     """Add the 'Game	Hammer' entry into the Gameinfo file while keeping the old contents."""
 
-    msglogger("Checking GameInfo.txt", "loading")
+    msglogger("Checking GameInfo.txt", type="loading")
     gameInfoPath = path.join(commonPath, selectedGame, inGameFolder, "gameinfo.txt")
 
     if not path.exists(gameInfoPath):
-        msglogger(f"Couldn't find the file '{gameInfoPath}'", "error")
+        msglogger(f"Couldn't find the file '{gameInfoPath}'", type="error")
         closeScript()
 
     with open(gameInfoPath, encoding="utf8") as file:
@@ -380,7 +380,7 @@ def parseGameInfo():
 
         if all(item in strip_line for item in {"game", "hammer"}):
             # Hammer is already in there, skip
-            msglogger("No need to modify", "warning")
+            msglogger("No need to modify", type="warning")
             break
 
         elif "|gameinfo_path|" in strip_line:
@@ -389,7 +389,7 @@ def parseGameInfo():
             with open(gameInfoPath, "w") as file:
                 for line in data:
                     file.write(line)
-            msglogger("Added a new entry", "good")
+            msglogger("Added a new entry", type="good")
             break
 
 
@@ -436,17 +436,17 @@ def downloadAddons():
             return (verS, versions[verS])
         else:
             # We didn't succeed, generate an error message and exit
-            msglogger(f"Version '{ver}' does not exist, available versions: '" + "', '".join(versions.keys()) + "'.", "error")
+            msglogger(f"Version '{ver}' does not exist, available versions: '" + "', '".join(versions.keys()) + "'.", type="error")
             closeScript()
 
 
 
     try:
-        msglogger(f"Looking up for {args.version} version", "loading")
+        msglogger(f"Looking up for {args.version} version", type="loading")
 
         version, zipUrl = getZipUrl(args.version)
 
-        msglogger(f"Downloading required files of version {version}", "loading")
+        msglogger(f"Downloading required files of version {version}", type="loading")
 
         # Download all required files for HammerAddons
         with request.urlopen(zipUrl) as data, TemporaryFile() as tempfile:
@@ -494,10 +494,10 @@ def downloadAddons():
                     break
 
     except Exception as error:
-        msglogger(f"An error ocurred while downloading the files ({error})", "error")
+        msglogger(f"An error ocurred while downloading the files ({error})", type="error")
         closeScript()
 
-    msglogger("Downloaded all files", "good")
+    msglogger("Downloaded all files", type="good")
 
 
 
@@ -531,7 +531,7 @@ def main():
         if not args.ignoreHammer:
             # We check continuosly if Hammer is open. Once it is closed, we continue.
             while isProcess("hammer.exe"):
-                msglogger("Hammer is running, please close it before continuing. Press any key to retry.", "error", blink=True)
+                msglogger("Hammer is running, please close it before continuing. Press any key to retry.", type="error", blink=True)
                 runsys("pause > nul")
                 print("\x1b[A", end="")
 
@@ -540,10 +540,10 @@ def main():
         if not args.skipDownload: downloadAddons()
 
     except KeyboardInterrupt:
-        msglogger("Installation interrupted", "error")
+        msglogger("Installation interrupted", type="error")
         closeScript()
 
-    msglogger(f"Finished installing HammerAddons for {selectedGame}!", "good", blink=True)
+    msglogger(f"Finished installing HammerAddons for {selectedGame}!", type="good", blink=True)
     closeScript()
 
 
