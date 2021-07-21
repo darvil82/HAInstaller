@@ -15,7 +15,7 @@ from time import sleep
 
 POSTCOMPILER_ARGS = "--propcombine $path\$file"
 VERSION = "1.5.2"
-AVAILABLE_GAMES = {
+AVAILABLE_GAMES: dict[str, tuple] = {
     # Game definitions. These specify the name of the main game folder, and for every game, the fgd, and the second game folder inside.
     # Game Folder: (folder2, fgdname)
 
@@ -210,7 +210,7 @@ def getSteamPath() -> tuple:
         folder = input()
 
 
-    steamlibs = [folder]
+    steamlibs: list[str] = [folder]
 
     # Find other steam libraries (thanks TeamSpen)
     try:
@@ -224,6 +224,7 @@ def getSteamPath() -> tuple:
                 steamlibs.append(prop.value)
 
     msglogger(f"Got Steam path '{folder}'", type="good")
+
     return tuple(steamlibs)
 
 
@@ -241,7 +242,8 @@ def selectGame(steamlibs: tuple) -> tuple:
     """
 
     # Populate usingGames with the games that the user has installed and are supported by HammerAddons
-    usingGames = []
+    usingGames: list[tuple[str, str]] = []
+
     for lib in steamlibs:
         common = path.join(lib, "steamapps/common")
         for game in listdir(common):
@@ -303,7 +305,7 @@ def parseCmdSeq():
     cmdSeqDefaultPath = path.join(gameBin, "CmdSeqDefault.wc")
 
     # Postcompiler command definition
-    POSTCOMPILER_CMD = {
+    POSTCOMPILER_CMD: dict[str, str] = {
         "exe": path.join(gameBin, "postcompiler/postcompiler.exe"),
         "args": args.args.lower()
     }
@@ -421,7 +423,8 @@ def downloadAddons():
 
         # Create a dict with all the versionTags: zipUrls
         # We iterate through every release getting the only values that we need, the "tag_name", and the "browser_download_url"
-        versions = {}
+        versions: dict[str, str] = {}
+
         for release in data:
             tag = stripVersion(release.get("tag_name"))
             url = release.get("assets")[0].get("browser_download_url")
