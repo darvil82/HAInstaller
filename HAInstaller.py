@@ -14,7 +14,7 @@ from time import sleep
 
 
 POSTCOMPILER_ARGS = "--propcombine $path\$file"
-VERSION = "1.5.1-2"
+VERSION = "1.5.2"
 AVAILABLE_GAMES = {
     # Game definitions. These specify the name of the main game folder, and for every game, the fgd, and the second game folder inside.
     # Game Folder: (folder2, fgdname)
@@ -123,10 +123,7 @@ def isProcess(process: str) -> bool:
 
     runsys(f"tasklist /FI \"IMAGENAME eq {process}\" > {tempFile}")
     with open(tempFile) as f:
-        if process in f.read():
-            return True
-        else:
-            return False
+        return process in f.read()
 
 
 
@@ -174,7 +171,7 @@ def getSteamPath() -> tuple:
     First checks the registry key for SteamPath, and if it can't find it, the path will be prompted to the user.
     """
 
-    def checkPath(filename: str) -> bool:
+    def checkPath(foldername: str) -> bool:
         """Check if the filepath supplied is valid and actually contains Steam."""
 
         # All the files that the main Steam path should contain
@@ -188,15 +185,14 @@ def getSteamPath() -> tuple:
         }
 
         # Check if the path supplied is actually the true Steam path by checking if it contains every file in STEAM_CONTENTS
-        if path.isdir(filename):
-            for steamfile in STEAM_CONTENTS:
-                if not path.exists(path.join(filename, steamfile)):
-                    msglogger(f"The directory '{filename}' isn't a valid Steam directory.", "error")
-                    break
-                else:
-                    return True
+        if path.isdir(foldername):
+            if all(item in listdir(foldername) for item in STEAM_CONTENTS):
+                return True
+            else:
+                msglogger(f"The directory '{foldername}' isn't a valid Steam directory.", "error")
+                return False
         else:
-            msglogger(f"The directory '{filename}' does not exist.", "error")
+            msglogger(f"The directory '{foldername}' does not exist.", "error")
 
 
     try:
@@ -411,7 +407,7 @@ def downloadAddons():
     vdfUrl = "https://raw.githubusercontent.com/DarviL82/HAInstaller/main/resources/srctools.vdf"
 
 
-    def getZipUrl(ver: str) -> str:
+    def getZipUrl(ver: str) -> tuple:
         """
         Return a tuple with the version tag, and the url of the zip download page from the version specified. (`(verTag, zipUrl)`)
 
@@ -537,7 +533,7 @@ def main():
             while isProcess("hammer.exe"):
                 msglogger("Hammer is running, please close it before continuing. Press any key to retry.", "error", blink=True)
                 runsys("pause > nul")
-                print("\x1b[A\x1b[2K", end="")
+                print("\x1b[A", end="")
 
         if not args.skipCmdSeq: parseCmdSeq()
         if not args.skipGameinfo: parseGameInfo()
