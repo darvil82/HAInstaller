@@ -17,8 +17,8 @@ Automatic installer for [TeamSpen's Hammer Addons](https://github.com/TeamSpen21
 ![HAInstaller](https://user-images.githubusercontent.com/48654552/126181869-163ab1bf-1774-475a-bafe-199380f38926.gif)
 
 ```
-usage: HAInstaller.py [-h] [-a ARGS] [-g GAME] [-v VERSION] [--skipCmdSeq] [--skipGameinfo] [--skipDownload] [--ignoreHammer]
-                      [--chkup]
+usage: HAInstaller.py [-h] [-a ARGS] [-g GAME] [-v VERSION] [--skipCmdSeq] [--skipGameinfo] [--skipDownload] [--verbose]
+                      [--ignoreHammer] [--chkup]
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -30,14 +30,9 @@ optional arguments:
   --skipCmdSeq          Do not modify the CmdSeq.wc file.
   --skipGameinfo        Do not modify the gameinfo.txt file.
   --skipDownload        Do not download any files.
+  --verbose             Show more information of all the steps.
   --ignoreHammer        Do not check if Hammer is running.
   --chkup               Check for new versions of the installer.
-
-Using version 1.5
-
-Repositories:
-    HAInstaller:    https://github.com/DarviL82/HAInstaller
-    HammerAddons:   https://github.com/TeamSpen210/HammerAddons
 ```
 
 <hr>
