@@ -234,7 +234,12 @@ def getSteamPath() -> tuple:
     else:
         for prop in conf.find_key("LibraryFolders"):
             if prop.name.isdigit():
-                lib = prop.value[0].value
+                # Huh, seems like this file has a new structure, so I did this ugly thing to support both structures
+                if isinstance(prop.value[0], str):
+                    lib = prop.value
+                else:
+                    lib = prop.value[0].value
+
                 if path.isdir(path.join(lib, "steamapps/common")):
                     steamlibs.append(lib)
 
