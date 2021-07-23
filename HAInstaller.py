@@ -14,7 +14,7 @@ from time import sleep
 
 
 POSTCOMPILER_ARGS = "--propcombine $path\$file"
-VERSION = "1.6"
+VERSION = "1.6-1"
 AVAILABLE_GAMES: dict[str, tuple] = {
     # Game definitions. These specify the name of the main game folder, and for every game, the fgd, and the second game folder inside.
     # Game Folder: (folder2, fgdname)
@@ -234,11 +234,11 @@ def getSteamPath() -> tuple:
     else:
         for prop in conf.find_key("LibraryFolders"):
             if prop.name.isdigit():
-                # Huh, seems like this file has a new structure, so I did this ugly thing to support both structures
-                if isinstance(prop.value[0], str):
-                    lib = prop.value
-                else:
+                # Huh, seems like this file has a new structure, so we check if it contains kvs inside or not
+                if prop.has_children():
                     lib = prop.value[0].value
+                else:
+                    lib = prop.value
 
                 if path.isdir(path.join(lib, "steamapps/common")):
                     steamlibs.append(lib)
