@@ -15,7 +15,7 @@ from time import sleep
 
 POSTCOMPILER_ARGS = "--propcombine $path\$file"
 VERSION = "1.6-1"
-AVAILABLE_GAMES: dict[str, tuple] = {
+AVAILABLE_GAMES: dict[str, tuple[str, str]] = {
     # Game definitions. These specify the name of the main game folder, and for every game, the fgd, and the second game folder inside.
     # Game Folder: (folder2, fgdname)
 
