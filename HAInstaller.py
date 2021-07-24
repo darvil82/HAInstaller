@@ -14,7 +14,7 @@ from time import sleep
 
 
 POSTCOMPILER_ARGS = "--propcombine $path\$file"
-VERSION = "1.6-2"
+VERSION = "1.6-3"
 AVAILABLE_GAMES: dict[str, tuple[str, str]] = {
     # Game definitions. These specify the name of the main game folder, and for every game, the fgd, and the second game folder inside.
     # Game Folder: (folder2, fgdname)
@@ -63,28 +63,6 @@ def msglogger(*values: object, type: str = None, blink: bool = False, end: str =
 
 
 
-def checkUpdates():
-    """Check if the latest version is not equal to the one that we are using"""
-
-    url = "https://api.github.com/repos/DarviL82/HAInstaller/releases/latest"
-    msglogger("Checking for new versions", type="loading")
-
-    try:
-        with request.urlopen(url) as data:
-            release = jsonLoads(data.read())
-            version = stripVersion(release.get("tag_name"))
-    except Exception:
-        msglogger("An error ocurred while checking for updates", type="error")
-        closeScript(1)
-
-    if version != VERSION:
-        msglogger(f"There is a new version available.\n\tUsing:\t{VERSION}\n\tLatest:\t{version}", type="warning")
-    else:
-        msglogger("Using latest version", type="good")
-
-
-
-
 def closeScript(errorlevel: int = 0):
     """Closes the script with an errorlevel"""
 
@@ -111,6 +89,7 @@ def getIndent(string: str) -> str:
             indent += x
         else:
             return indent
+
 
 
 
@@ -161,12 +140,7 @@ def parseArgs():
     argparser.add_argument("--skipDownload", help="Do not download any files.", action="store_true")
     argparser.add_argument("--verbose", help="Show more information of all the steps.", action="store_true")
     argparser.add_argument("--ignoreHammer", help="Do not check if Hammer is running.", action="store_true")
-    argparser.add_argument("--chkup", help="Check for new versions of the installer.", action="store_true")
     args = argparser.parse_args()
-
-    if args.chkup:
-        checkUpdates()
-        exit()
 
 
 
