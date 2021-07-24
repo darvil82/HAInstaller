@@ -14,7 +14,7 @@ from time import sleep
 
 
 POSTCOMPILER_ARGS = "--propcombine $path\$file"
-VERSION = "1.6-1"
+VERSION = "1.6-2"
 AVAILABLE_GAMES: dict[str, tuple[str, str]] = {
     # Game definitions. These specify the name of the main game folder, and for every game, the fgd, and the second game folder inside.
     # Game Folder: (folder2, fgdname)
@@ -296,13 +296,14 @@ def selectGame(steamlibs: tuple) -> tuple:
     msglogger("Select a game to install HammerAddons", type="loading")
     for number, game in enumerate(usingGames):
         if args.verbose:
-            print(f"\t{number + 1}: {game[0]}\t('{path.join(game[1], 'steamapps/common/', game[0])}')")
+            print(f"\t{number + 1}: {game[0]} ('{path.join(game[1], 'steamapps/common/', game[0])}')")
         else:
             print(f"\t{number + 1}: {game[0]}")
+    print("")
 
     while True:
         try:
-            usrInput = int(input())
+            usrInput = int(input(f"[1-{len(usingGames)}]: "))
             if usrInput not in range(1, len(usingGames) + 1):
                 raise ValueError
 
