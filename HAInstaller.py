@@ -153,9 +153,9 @@ def parseArgs():
         ),
         formatter_class=argparse.RawTextHelpFormatter
     )
-    argparser.add_argument("-a", "--args", help=f"Arguments for a hammer compile step. Default are '{POSTCOMPILER_ARGS}'", default=POSTCOMPILER_ARGS)
+    argparser.add_argument("-a", "--args", help=f"Arguments for the PostCompiler executable. Default are '{POSTCOMPILER_ARGS}'.", default=POSTCOMPILER_ARGS)
     argparser.add_argument("-g", "--game", help="The name of the game folder in which the addons will be installed.")
-    argparser.add_argument("-v", "--version", help="Select the version of HammerAddons to install. Please keep in mind that all versions\nmight not be compatible with all the games. Default value is 'latest'.", default="latest")
+    argparser.add_argument("-v", "--version", help="Select the version of HammerAddons to install. Please keep in mind that some versions\nmight not be compatible with all the games. Default value is 'latest'.", default="latest")
     argparser.add_argument("--skipCmdSeq", help="Do not modify the CmdSeq.wc file.", action="store_true")
     argparser.add_argument("--skipGameinfo", help="Do not modify the gameinfo.txt file.", action="store_true")
     argparser.add_argument("--skipDownload", help="Do not download any files.", action="store_true")
