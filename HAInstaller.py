@@ -308,7 +308,7 @@ def selectGame(steamlibs: tuple) -> tuple:
                 raise ValueError
 
             # The value is correct, so we move the cursor up the same number of lines taken by the menu to drawn, so then we can override it
-            print(f"\x1b[{len(usingGames) + 1}A\x1b[0J", end="")
+            print(f"\x1b[{len(usingGames) + 2}A\x1b[0J", end="")
             msglogger(f"Selected game '{usingGames[usrInput - 1][0]}'", type="good")
             return tuple(usingGames[usrInput - 1])
         except (ValueError, IndexError):
