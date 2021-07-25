@@ -120,7 +120,7 @@ class Version(str):
         else:
             raise Exception(f"Maximun Version lenght exceeded. ({self._maxLenght})")
 
-        if len(parts) > 1:
+        if len(parts) > 1 and parts[1]:
             result += float(parts[1]) / 10
         return result
 
