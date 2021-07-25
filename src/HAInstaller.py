@@ -6,8 +6,8 @@ from tempfile import TemporaryFile
 from urllib import request
 from json import loads as jsonLoads
 from zipfile import ZipFile
-from sys import exit
 from textwrap import dedent
+from sys import exit
 from utils import *
 
 
