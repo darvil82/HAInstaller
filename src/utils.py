@@ -76,69 +76,93 @@ def isProcess(process: str) -> bool:
 
 
 
-class Version(str):
+class Version():
 	"""Simple object for managing versions a bit easier.
 		>>> Version("1.4.5-2") < Version("1.5-6")
 		>>> True
 	"""
 
-	def __init__(self, version: str, sep: str = ".") -> None:
-		"""The string format should be something like `1.2.3` or `1.2.3-4`.
-			* `sep` is the seperator of every version field. A dot is normally what is used."""
+	def __init__(self, version: str, seps: list = [".", "-"]) -> None:
+		"""
+		The string format should be something like `1.2.3` or `1.2.3-4`.
+
+		- `sep` is the seperator of every version field. A dot and a '-' is normally what is used.
+
+		The values separated by dots are considered as the 'main' values of the version, and the number
+		after the '-' is considered as a subversion value, which is less important.
+		"""
 
 		self.version = version
-		self._sep = sep
-		self._maxLenght = 16
-		self.stripped = self._stripVersion(self.version)
-		self._float = self._toFloat(self.stripped)
+		self._seps = seps
+		self.stripped = self._strip(self.version)
+		self._splitted = self._split(self.stripped)
 
 
-	def _stripVersion(self, string: str) -> str:
-		"""Remove any character from string which isn't a number, dot, or -"""
+	def _strip(self, string: str) -> str:
+		"""Remove any character from string which isn't a number, or any of the separators"""
 
 		endStr = ""
 		for char in string:
 			if char.isdigit() or char in ".-":
 				endStr += char
 				continue
-		return endStr
 
-
-	def _toFloat(self, version: str) -> list:
-		parts = version.split("-")
-
-		if version:
-			main = parts[0].split(self._sep)
-			result = float("".join(main))
+		if endStr == "":
+			return "0"
 		else:
-			result = 0
+			return endStr
 
 
-		if self._countChars(int(result)) < self._maxLenght:
-			for x in range(0, self._maxLenght - self._countChars(int(result))):
-				result *= 10
+	def _split(self, ver: str) -> list:
+		split = ver.split(self._seps[1])
+		main = [int(hoho) for hoho in split[0].split(self._seps[0])]
+
+		# Remove all the trailing 0's of version, since those have no value.
+		for number, item in reversed(list(enumerate(main))):
+			if item == 0:
+				main.pop(number)
+			else:
+				break
+
+		# Ignore empty fields
+		if len(split) > 1 and split[1] != "":
+			sub = int(split[1])
 		else:
-			raise Exception(f"Maximun Version lenght exceeded. ({self._maxLenght})")
+			sub = 0
 
-		if len(parts) > 1 and parts[1]:
-			result += float(parts[1]) / 10
-		return result
+		return [main, sub]
 
 
-	def _countChars(self, object) -> int:
-		cnt = 0
-		for x in str(object):
-			cnt += 1
-		return cnt
+	def _compare(self, first: object, second: object):
+		ver1 = first._splitted
+		ver2 = second._splitted
 
-	def __lt__(self, other) -> bool:
-		return self._float < other._float
+		if not ver1[0] == ver2[0]:
+			# Checking main
+			ver2Main = ver2[0]
+			for number, item in enumerate(ver1[0]):
+				if len(ver2Main) == number:
+					return True
+				elif item > ver2Main[number]:
+					return True
+				elif item < ver2Main[number]:
+					return False
+				elif item == ver2Main[number]:
+					continue
+			return False
+		else:
+			# Checking the second value
+			return ver1[1] > ver2[1]
+
 
 	def __gt__(self, other) -> bool:
-		return self._float > other._float
+		return self._compare(self, other)
+
+	def __lt__(self, other) -> bool:
+		return self._compare(other, self)
 
 	def __eq__(self, other) -> bool:
-		return self._float == other._float
+		return self._splitted == other._splitted
 
 	def __repr__(self) -> str:
 		return self.stripped
