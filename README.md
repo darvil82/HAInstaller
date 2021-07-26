@@ -32,6 +32,7 @@ optional arguments:
   --skipDownload        Do not download any files.
   --verbose             Show more information of all the steps.
   --ignoreHammer        Do not check if Hammer is running.
+  --chkup               Check for new versions of the installer.
 ```
 
 <hr>
