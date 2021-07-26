@@ -157,8 +157,14 @@ class Version():
 	def __gt__(self, other) -> bool:
 		return self._compare(self, other)
 
+	def __ge__(self, other) -> bool:
+		return self.__gt__(other) or self.__eq__(other)
+
 	def __lt__(self, other) -> bool:
 		return self._compare(other, self)
+
+	def __le__(self, other) -> bool:
+		return self.__lt__(other) or self.__eq__(other)
 
 	def __eq__(self, other) -> bool:
 		return self._splitted == other._splitted
