@@ -92,10 +92,9 @@ class Version():
 		after the '-' is considered as a subversion value, which is less important.
 		"""
 
-		self.version = version
 		self._seps = seps
-		self.stripped = self._strip(self.version)
-		self._splitted = self._split(self.stripped)
+		self._stripped = self._strip(version)
+		self._splitted = self._split(self._stripped)
 
 
 	def _strip(self, string: str) -> str:
@@ -107,7 +106,7 @@ class Version():
 				endStr += char
 				continue
 
-		if endStr == "":
+		if endStr == "" or ".." in endStr:
 			return "0"
 		else:
 			return endStr
@@ -165,10 +164,10 @@ class Version():
 		return self._splitted == other._splitted
 
 	def __repr__(self) -> str:
-		return self.stripped
+		return self._stripped
 
 	def __hash__(self) -> int:
 		return hash(str(self))
 
 	def __str__(self) -> str:
-		return self.stripped
+		return self._stripped
