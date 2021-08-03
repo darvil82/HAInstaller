@@ -1,3 +1,4 @@
+from time import sleep
 import winreg
 import argparse
 from os import path, listdir, system as runsys
@@ -8,7 +9,8 @@ from json import loads as jsonLoads
 from zipfile import ZipFile
 from textwrap import dedent
 from sys import exit
-from utils import *
+from utils import getIndent, isProcess, Version
+from pbar import PBar, VT100
 
 
 
@@ -43,6 +45,64 @@ def vLog(message: str, end="\n"):
 	"""Prints a message if verbose is on"""
 
 	if args.verbose: print(message, end=end, flush=True)
+
+
+
+
+
+
+def msgLogger(*values: object, type: str = None, blink: bool = False, end: str = "\n"):
+	global progressBar
+	"""
+	Print a message out on the terminal.
+		- Types: `good, error, loading, warning`
+	"""
+
+	MSG_PREFIX = {
+		"error":    "\x1b[91m[ E ]",
+		"good":     "\x1b[92m[ √ ]\x1b[97m",
+		"loading":  "\x1b[33m[...]",
+		"warning":  "\x1b[96m[ ! ]"
+	}
+
+	msg = f"\x1b[9999D\x1b[4m{MSG_PREFIX.get(type, '[   ]')}\x1b[24m {' '.join(str(item) for item in values)}\x1b[0m\x1b[K"
+
+	if blink:
+		print(f"\x1b[7m{msg}\x1b[27m", end="", flush=True)
+		sleep(0.25)
+
+	# progresssbar
+	if type == "error":
+		pbColor = (255, 0, 0)
+	elif type == "good":
+		pbColor = (0, 255, 0)
+	elif type == "loading":
+		pbColor = (205, 150, 0)
+	elif type == "warning":
+		pbColor = (0, 200, 255)
+
+	progressBar.colorset = {
+		"horiz":	pbColor,
+		"vert":		pbColor,
+		"corner":	pbColor,
+		"text":		pbColor
+	}
+	progressBar.draw()
+	sleep(0.15)
+
+	print(msg, end=end)
+
+
+
+
+
+
+def closeScript(errorlevel: int = 0):
+	"""Closes the script with an errorlevel"""
+
+	runsys("pause > nul")
+	print(VT100.bufferOld, end="")
+	exit(errorlevel)
 
 
 
@@ -524,18 +584,25 @@ def downloadAddons():
 
 
 def main():
-	global inGameFolder, selectedGame, commonPath
+	global inGameFolder, selectedGame, commonPath, progressBar
 
 	runsys("")  # This is required to be able to display VT100 sequences on Windows 10
-	print(f"\n\x1b[97m\x1b[4mTeamSpen's Hammer Addons Installer - v{VERSION}\x1b[0m\n")
+	print(f"{VT100.bufferNew}\n\x1b[97m\x1b[4mTeamSpen's Hammer Addons Installer - v{VERSION}\x1b[0m\n\n\n\n\n")
 	parseArgs()
+
+	progressBar = PBar(range=(0, 6), position=(23, 4), text="Preparing...")
+	progressBar.draw()
 
 	try:
 		steamlibs = getSteamPath()
 
+		progressBar.step()
+
 		selectedGame, steamPath = selectGame(steamlibs)
 		commonPath = path.join(steamPath, "steamapps/common")
 		inGameFolder = AVAILABLE_GAMES.get(selectedGame)[0]
+
+		progressBar.step()
 
 		if not args.ignoreHammer:
 			# We check continuosly if Hammer is open. Once it is closed, we continue.
@@ -544,8 +611,14 @@ def main():
 				runsys("pause > nul")
 				print("\x1b[A", end="")
 
+		progressBar.text = "Processing CmdSeq"
+		progressBar.step()
 		if not args.skipCmdSeq: parseCmdSeq()
+		progressBar.text = "Processing Gameinfo"
+		progressBar.step()
 		if not args.skipGameinfo: parseGameInfo()
+		progressBar.text = "Downloading files"
+		progressBar.step()
 		if not args.skipDownload: downloadAddons()
 
 	except KeyboardInterrupt:
@@ -553,6 +626,8 @@ def main():
 		closeScript(1)
 
 	msgLogger(f"Finished installing HammerAddons for {selectedGame}!", type="good", blink=True)
+	progressBar.text = "Done!"
+	progressBar.step()
 	closeScript()
 
 
