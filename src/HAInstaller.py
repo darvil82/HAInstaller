@@ -16,7 +16,7 @@ from pbar import PBar, VT100
 
 
 POSTCOMPILER_ARGS = "--propcombine $path\$file"
-VERSION = Version("1.6.1")
+VERSION = Version("1.7")
 AVAILABLE_GAMES: dict[str, tuple[str, str]] = {
 	# Game definitions. These specify the name of the main game folder, and for every game, the fgd, and the second game folder inside.
 	# Game Folder: (folder2, fgdname)
@@ -71,6 +71,8 @@ def msgLogger(*values: object, type: str = None, blink: bool = False, end: str =
 		print(f"\x1b[7m{msg}\x1b[27m", end="", flush=True)
 		sleep(0.25)
 
+	sleep(0.15)
+
 	# progresssbar
 	if type == "error":
 		pbColor = (255, 0, 0)
@@ -85,10 +87,9 @@ def msgLogger(*values: object, type: str = None, blink: bool = False, end: str =
 		"horiz":	pbColor,
 		"vert":		pbColor,
 		"corner":	pbColor,
-		"text":		pbColor
+		"text":		{"outside":	pbColor}
 	}
 	progressBar.draw()
-	sleep(0.15)
 
 	print(msg, end=end)
 
