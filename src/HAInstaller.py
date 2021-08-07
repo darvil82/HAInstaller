@@ -588,8 +588,8 @@ def main():
 	global inGameFolder, selectedGame, commonPath, progressBar
 
 	runsys("")  # This is required to be able to display VT100 sequences on Windows 10
-	print(f"{VT100.bufferNew}\n\x1b[97m\x1b[4mTeamSpen's Hammer Addons Installer - v{VERSION}\x1b[0m\n\n\n\n\n")
 	parseArgs()
+	print(f"{VT100.bufferNew}\n\x1b[97m\x1b[4mTeamSpen's Hammer Addons Installer - v{VERSION}\x1b[0m\n\n\n\n\n")
 
 	progressBar = PBar(range=(0, 6), position=(23, 4), text="Preparing...")
 	progressBar.draw()
