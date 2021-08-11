@@ -46,10 +46,11 @@ AVAILABLE_GAMES: dict[str, tuple[str, str]] = {
 def vLog(message: str, end="\n", onlyAppend: bool = False):
 	"""Prints a message if verbose is on"""
 
-	if args.verbose and not onlyAppend: print(message, end=end, flush=True)
+	if args.verbose:
+		if onlyAppend: print(message, end=end, flush=True)
 
-	with open("HAInstaller.log", "a", errors="ignore") as f:
-		f.write(message + "\n")
+		with open("HAInstaller.log", "a", errors="ignore") as f:
+			f.write(message + "\n")
 
 
 
