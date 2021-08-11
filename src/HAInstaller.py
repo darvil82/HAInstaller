@@ -9,6 +9,8 @@ from json import loads as jsonLoads
 from zipfile import ZipFile
 from textwrap import dedent
 from sys import exit
+from platform import architecture
+
 from utils import getIndent, isProcess, Version
 from pbar import PBar, VT100
 
@@ -16,7 +18,7 @@ from pbar import PBar, VT100
 
 
 POSTCOMPILER_ARGS = "--propcombine $path\$file"
-VERSION = Version("1.7")
+VERSION = Version("1.7.1")
 AVAILABLE_GAMES: dict[str, tuple[str, str]] = {
 	# Game definitions. These specify the name of the main game folder, and for every game, the fgd, and the second game folder inside.
 	# Game Folder: (folder2, fgdname)
@@ -41,10 +43,13 @@ AVAILABLE_GAMES: dict[str, tuple[str, str]] = {
 
 
 
-def vLog(message: str, end="\n"):
+def vLog(message: str, end="\n", onlyAppend: bool = False):
 	"""Prints a message if verbose is on"""
 
-	if args.verbose: print(message, end=end, flush=True)
+	if args.verbose and not onlyAppend: print(message, end=end, flush=True)
+
+	with open("HAInstaller.log", "a", errors="ignore") as f:
+		f.write(message + "\n")
 
 
 
@@ -65,7 +70,8 @@ def msgLogger(*values: object, type: str = None, blink: bool = False, end: str =
 		"warning":  "\x1b[96m[ ! ]"
 	}
 
-	msg = f"\x1b[9999D\x1b[4m{MSG_PREFIX.get(type, '[   ]')}\x1b[24m {' '.join(str(item) for item in values)}\x1b[0m\x1b[K"
+	strs = ' '.join(str(item) for item in values)
+	msg = f"\x1b[9999D\x1b[4m{MSG_PREFIX.get(type, '[   ]')}\x1b[24m {strs}\x1b[0m\x1b[K"
 
 	if blink:
 		print(f"\x1b[7m{msg}\x1b[27m", end="", flush=True)
@@ -92,6 +98,7 @@ def msgLogger(*values: object, type: str = None, blink: bool = False, end: str =
 	progressBar.draw()
 
 	print(msg, end=end)
+	vLog(f">>> ({type}): {strs}", onlyAppend=True)		# print also to file if verbose is on
 
 
 
@@ -103,6 +110,7 @@ def closeScript(errorlevel: int = 0):
 
 	runsys("pause > nul")
 	print(VT100.bufferOld, end="")
+	vLog("\n\n\n\nScript terminated", onlyAppend=True)
 	exit(errorlevel)
 
 
@@ -159,7 +167,7 @@ def parseArgs():
 	argparser.add_argument("--skipCmdSeq", help="Do not modify the CmdSeq.wc file.", action="store_true")
 	argparser.add_argument("--skipGameinfo", help="Do not modify the gameinfo.txt file.", action="store_true")
 	argparser.add_argument("--skipDownload", help="Do not download any files.", action="store_true")
-	argparser.add_argument("--verbose", help="Show more information of all the steps.", action="store_true")
+	argparser.add_argument("--verbose", help="Show more information of all the steps and create a log file", action="store_true")
 	argparser.add_argument("--ignoreHammer", help="Do not check if Hammer is running.", action="store_true")
 	argparser.add_argument("--chkup", help="Check for new versions of the installer.", action="store_true")
 	args = argparser.parse_args()
@@ -334,13 +342,22 @@ def parseCmdSeq():
 
 	msgLogger("Adding postcompiler compile commands", type="loading")
 
-	gameBin = path.join(commonPath, selectedGame, "bin/")
+	gameBin = path.join(commonPath, selectedGame.lower(), "bin/")
 	cmdSeqPath = path.join(gameBin, "CmdSeq.wc")
 	cmdSeqDefaultPath = path.join(gameBin, "CmdSeqDefault.wc")
 
+	if Version(args.version) >= Version("2.4.0") or args.version == "latest":
+		if isSysX64:
+			compFolder = "postcompiler_win64"
+		else:
+			compFolder = "postcompiler_win32"
+	else:
+		compFolder = "postcompiler"
+
+
 	# Postcompiler command definition
 	POSTCOMPILER_CMD: dict[str, str] = {
-		"exe": path.join(gameBin, "postcompiler/postcompiler.exe"),
+		"exe": path.join(gameBin, f"{compFolder}/postcompiler.exe"),
 		"args": args.args.lower()
 	}
 
@@ -373,7 +390,7 @@ def parseCmdSeq():
 			vLog(f"\t   └ Command:\n\t\tExe:      '{exeValue}'\n\t\tArgument: '{argValue}'")
 
 			if foundBsp:
-				if "postcompiler" not in exeValue:
+				if POSTCOMPILER_CMD["exe"] != exeValue:
 					commands.insert(index, cmdseq.Command(POSTCOMPILER_CMD["exe"], POSTCOMPILER_CMD["args"]))
 					vLog("\t--- Found VBSP, appended command ---")
 					cmdsAdded += 1
@@ -504,15 +521,27 @@ def downloadAddons():
 			tempfile.write(data.read())
 
 			vLog(f"Done")
-
+			msgLogger(f"Unzipping files", type="loading")
 
 			with ZipFile(tempfile) as zipfile:
 				for file in zipfile.namelist():
 					# Extract the files found to the locations that we want
-					if file.startswith("postcompiler/"):
-						zipfile.extract(file, path.join(gamePath, "bin/"))
-						vLog(f"\tExtracted file '{selectedGame}/bin/{file}'")
-					elif file.startswith("hammer/"):
+					if file.startswith("postcompiler"):
+						if isSysX64 and file.startswith("postcompiler_win64/"):
+							zipfile.extract(file, path.join(gamePath, "bin/"))
+							vLog(f"\tExtracted file '{selectedGame}/bin/{file}'")
+
+						elif not isSysX64 and file.startswith("postcompiler_win32/"):
+							zipfile.extract(file, path.join(gamePath, "bin/"))
+							vLog(f"\tExtracted file '{selectedGame}/bin/{file}'")
+
+						elif file.startswith("postcompiler/"):
+							zipfile.extract(file, path.join(gamePath, "bin/"))
+							vLog(f"\tExtracted file '{selectedGame}/bin/{file}'")
+
+
+
+					if file.startswith("hammer/"):
 						zipfile.extract(file, gamePath)
 						vLog(f"\tExtracted file '{selectedGame}/{file}'")
 					elif file.startswith(f"instances/{inGameFolder}/"):
@@ -585,10 +614,12 @@ def downloadAddons():
 
 
 def main():
-	global inGameFolder, selectedGame, commonPath, progressBar
+	global inGameFolder, selectedGame, commonPath, progressBar, isSysX64
 
 	runsys("")  # This is required to be able to display VT100 sequences on Windows 10
 	parseArgs()
+	isSysX64 = "64" in architecture()[0]
+
 	print(f"{VT100.bufferNew}\n\x1b[97m\x1b[4mTeamSpen's Hammer Addons Installer - v{VERSION}\x1b[0m\n\n\n\n\n")
 
 	progressBar = PBar(range=(0, 6), position=(23, 4), text="Preparing...")
