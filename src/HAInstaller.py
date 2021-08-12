@@ -50,7 +50,7 @@ def vLog(message: str, end="\n", onlyAppend: bool = False):
 		if not onlyAppend: print(message, end=end, flush=True)
 
 		with open("HAInstaller.log", "a", errors="ignore") as f:
-			f.write(message + "\n")
+			f.write(message + end)
 
 
 
