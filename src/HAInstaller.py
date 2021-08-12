@@ -18,7 +18,7 @@ from pbar import PBar, VT100
 
 
 POSTCOMPILER_ARGS = "--propcombine $path\$file"
-VERSION = Version("1.7.1")
+VERSION = Version("1.7.2")
 AVAILABLE_GAMES: dict[str, tuple[str, str]] = {
 	# Game definitions. These specify the name of the main game folder, and for every game, the fgd, and the second game folder inside.
 	# Game Folder: (folder2, fgdname)
@@ -47,7 +47,7 @@ def vLog(message: str, end="\n", onlyAppend: bool = False):
 	"""Prints a message if verbose is on"""
 
 	if args.verbose:
-		if onlyAppend: print(message, end=end, flush=True)
+		if not onlyAppend: print(message, end=end, flush=True)
 
 		with open("HAInstaller.log", "a", errors="ignore") as f:
 			f.write(message + "\n")
@@ -111,7 +111,7 @@ def closeScript(errorlevel: int = 0):
 
 	runsys("pause > nul")
 	print(VT100.bufferOld, end="")
-	vLog("\n\n\n\nScript terminated", onlyAppend=True)
+	vLog("Script terminated\n\n\n\n", onlyAppend=True)
 	exit(errorlevel)
 
 
@@ -171,6 +171,7 @@ def parseArgs():
 	argparser.add_argument("--verbose", help="Show more information of all the steps and create a log file", action="store_true")
 	argparser.add_argument("--ignoreHammer", help="Do not check if Hammer is running.", action="store_true")
 	argparser.add_argument("--chkup", help="Check for new versions of the installer.", action="store_true")
+	argparser.add_argument("--noPbar", help="Disable the progress bar", action="store_true")
 	args = argparser.parse_args()
 
 	if args.chkup:
@@ -388,7 +389,7 @@ def parseCmdSeq():
 			exeValue = str(cmd.exe).lower()
 			argValue = str(cmd.args).lower()
 
-			vLog(f"\t   └ Command:\n\t\tExe:      '{exeValue}'\n\t\tArgument: '{argValue}'")
+			vLog(f"\t\tL Command:\n\t\t\tExe:      '{exeValue}'\n\t\t\tArgument: '{argValue}'")
 
 			if foundBsp:
 				if POSTCOMPILER_CMD["exe"] != exeValue:
@@ -621,9 +622,12 @@ def main():
 	parseArgs()
 	isSysX64 = "64" in architecture()[0]
 
-	print(f"{VT100.bufferNew}\n\x1b[97m\x1b[4mTeamSpen's Hammer Addons Installer - v{VERSION}\x1b[0m\n\n\n\n\n")
-
 	progressBar = PBar(range=(0, 6), position=(23, 4), text="Preparing...")
+	progressBar.enabled = not args.noPbar and not args.verbose
+
+	print(f"{VT100.bufferNew}\n\x1b[97m\x1b[4mTeamSpen's Hammer Addons Installer - v{VERSION}\x1b[0m\n")
+	if progressBar.enabled: print("\n\n\n")
+
 	progressBar.draw()
 
 	try:
