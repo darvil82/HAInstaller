@@ -33,7 +33,7 @@ AVAILABLE_GAMES: dict[str, tuple[str, str]] = {
 	"Left 4 Dead 2": ("left4dead2", "left4dead2"),
 	"Portal": ("portal", "portal"),
 	"Portal 2": ("portal2", "portal2"),
-	"Team Fortress 2": ("tf", "tf2")
+	"Team Fortress 2": ("tf", "tf")
 }
 
 
