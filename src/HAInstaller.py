@@ -18,7 +18,7 @@ from pbar import PBar, VT100
 
 
 POSTCOMPILER_ARGS = "--propcombine $path\$file"
-VERSION = Version("1.7.2")
+VERSION = Version("1.7.3")
 AVAILABLE_GAMES: dict[str, tuple[str, str]] = {
 	# Game definitions. These specify the name of the main game folder, and for every game, the fgd, and the second game folder inside.
 	# Game Folder: (folder2, fgdname)
@@ -58,38 +58,38 @@ def vLog(message: str, end="\n", onlyAppend: bool = False):
 
 
 def msgLogger(*values: object, type: str = None, blink: bool = False, end: str = "\n"):
-	global progressBar
 	"""
 	Print a message out on the terminal.
-		- Types: `good, error, loading, warning`
+	@type: Available types: `good, error, loading, warning`
 	"""
 
 	MSG_PREFIX = {
-		"error":    "\x1b[91m[ E ]",
-		"good":     "\x1b[92m[ √ ]\x1b[97m",
-		"loading":  "\x1b[33m[...]",
-		"warning":  "\x1b[96m[ ! ]"
+		"error":    f"{VT100.color((255, 87, 87))}[ E ]",
+		"good":     f"{VT100.color((48, 240, 134))}[ √ ]{VT100.color((255, 255, 255))}",
+		"loading":  f"{VT100.color((235, 175, 66))}[...]",
+		"warning":  f"{VT100.color((92, 160, 2557))}[ ! ]"
 	}
 
 	strs = ' '.join(str(item) for item in values)
-	msg = f"\x1b[9999D\x1b[4m{MSG_PREFIX.get(type, '[   ]')}\x1b[24m {strs}\x1b[0m\x1b[K"
+	msg = f"{VT100.moveHoriz(-9999)}{VT100.underline}{MSG_PREFIX.get(type, '[   ]')}{VT100.noUnderline} {strs}{VT100.reset}{VT100.clearRight}"
 
 	if blink:
-		print(f"\x1b[7m{msg}\x1b[27m", end="", flush=True)
+		print(f"{VT100.underline}{msg}{VT100.noUnderline}", end="", flush=True)
 		sleep(0.25)
 
 	sleep(0.15)
 
 	# progresssbar
 	if type == "error":
-		pbColor = (255, 0, 0)
+		pbColor = (255, 87, 87)
 	elif type == "good":
-		pbColor = (0, 255, 0)
+		pbColor = (48, 240, 134)
 	elif type == "loading":
-		pbColor = (205, 150, 0)
+		pbColor = (235, 175, 66)
 	elif type == "warning":
-		pbColor = (0, 200, 255)
+		pbColor = (92, 160, 255)
 
+	global progressBar
 	progressBar.colorset = {
 		"horiz":	pbColor,
 		"vert":		pbColor,
@@ -156,8 +156,8 @@ def parseArgs():
 			Using version {VERSION}
 
 			Repositories:
-				HAInstaller:    \x1b[4mhttps://github.com/DarviL82/HAInstaller\x1b[24m
-				HammerAddons:   \x1b[4mhttps://github.com/TeamSpen210/HammerAddons\x1b[24m
+				HAInstaller:    {VT100.underline}https://github.com/DarviL82/HAInstaller{VT100.noUnderline}
+				HammerAddons:   {VT100.underline}https://github.com/TeamSpen210/HammerAddons{VT100.noUnderline}
 			"""
 		),
 		formatter_class=argparse.RawTextHelpFormatter
@@ -302,7 +302,7 @@ def selectGame(steamlibs: tuple) -> tuple[str, str]:
 			for game, lib in usingGames:
 				if args.game == game:
 					msgLogger(f"Selected game '{args.game}'", type="good")
-					return tuple((args.game, lib))
+					return tuple((game, lib))
 
 			msgLogger(f"The game '{args.game}' is not installed", type="error")
 		else:
@@ -325,12 +325,12 @@ def selectGame(steamlibs: tuple) -> tuple[str, str]:
 				raise ValueError
 
 			# The value is correct, so we move the cursor up the same number of lines taken by the menu to drawn, so then we can override it
-			print(f"\x1b[{len(usingGames) + 2}A\x1b[0J", end="")
+			print(VT100.moveVert(-len(usingGames) - 2) + VT100.clearDown, end="")
 			msgLogger(f"Selected game '{usingGames[usrInput - 1][0]}'", type="good")
 			return tuple(usingGames[usrInput - 1])
 		except (ValueError, IndexError):
 			# If the value isn't valid, we move the terminal cursor up and then clear the line. This is done to not cause ugly spam when typing values
-			print("\x1b[A\x1b[2K", end="")
+			print(VT100.moveVert(-1) + VT100.clearLine, end="")
 
 
 
@@ -378,7 +378,8 @@ def parseCmdSeq():
 		data = cmdseq.parse(cmdfile)
 
 	# We check for the existence of the bsp command. If found, we append the postcompiler command right after it
-	cmdsAdded = 0
+	cmdsAdded = 0	# times we appended a postcompiler command
+	cmdsFound = 0	# times we found VBSP
 	for config in data:
 		foundBsp = False
 		commands = data.get(config)
@@ -405,15 +406,17 @@ def parseCmdSeq():
 				break
 			if exeValue == "$bsp_exe":
 				foundBsp = True
+				cmdsFound += 1
 				continue
 
-	if cmdsAdded == 0:
+	if cmdsFound < 1:
+		msgLogger("Couldn't find any configuration with commands", type="error")
+	elif cmdsAdded == 0:
 		# No commands were added, no need to modify
 		msgLogger("Found already existing commands", type="warning")
 	else:
 		with open(cmdSeqPath, "wb") as cmdfile:
 			cmdseq.write(data, cmdfile)
-
 		msgLogger(f"Added {cmdsAdded} command/s successfully", type="good")
 
 
@@ -496,7 +499,7 @@ def downloadAddons():
 			vLog(f"\tFound version {tag}\t('{url}')")
 
 
-		if ver == "latest":
+		if ver.lower() == "latest":
 			# If ver arg is "latest" we get the first key and value from the versions dict
 			return (tuple(versions.keys())[0], tuple(versions.values())[0])
 		elif verS in versions.keys():
@@ -504,7 +507,7 @@ def downloadAddons():
 			return (verS, versions[verS])
 		else:
 			# We didn't succeed, generate an error message and exit
-			msgLogger(f"Version '{ver}' does not exist, available versions: '" + "', '".join(map(str, versions.keys())) + "'.", type="error")
+			msgLogger(f"Version '{ver}' does not exist, available versions: '" + "', '".join(map(str, versions.keys())) + "'", type="error")
 			closeScript(1)
 
 
@@ -556,9 +559,10 @@ def downloadAddons():
 
 
 		# Download srctools.vdf, so we can modify it to have the correct game folder inside.
-		if not path.exists(path.join(gamePath, "srctools.vdf")):
+		vdfPath = path.join(gamePath, "srctools.vdf")
+		if not path.exists(vdfPath):
 			with request.urlopen(vdfUrl) as data:
-				with open(path.join(gamePath, "srctools.vdf"), "wb") as file:
+				with open(vdfPath, "wb") as file:
 					vLog(f"\tDownloading '{vdfUrl}'... ", end="")
 
 					file.write(data.read())
@@ -567,7 +571,7 @@ def downloadAddons():
 		else:
 			vLog("\tFound 'srctools.vdf'. Skipping.")
 
-		with open(path.join(gamePath, "srctools.vdf")) as file:
+		with open(vdfPath) as file:
 			data = list(file)
 
 		# Replace the gameinfo entry to match the game that we are installing
@@ -588,7 +592,7 @@ def downloadAddons():
 					data.insert(number, f"{getIndent(line)}\"gameinfo\" \"{inGameFolder}/\"\n")
 					vLog(f"\t^ Changed line to \"'gameinfo' '{inGameFolder}/'\".")
 
-					with open(path.join(gamePath, "srctools.vdf"), "w") as file:
+					with open(vdfPath, "w") as file:
 						for line in data:
 							file.write(line)
 					break
@@ -625,7 +629,7 @@ def main():
 	progressBar = PBar(range=(0, 6), position=(23, 4), text="Preparing...")
 	progressBar.enabled = not args.noPbar and not args.verbose
 
-	print(f"{VT100.bufferNew}\n\x1b[97m\x1b[4mTeamSpen's Hammer Addons Installer - v{VERSION}\x1b[0m\n")
+	print(f"{VT100.bufferNew}\n{VT100.color((0, 255, 255))}{VT100.underline}TeamSpen's Hammer Addons Installer - v{VERSION}{VT100.reset}\n")
 	if progressBar.enabled: print("\n\n\n")
 
 	progressBar.draw()
@@ -646,7 +650,7 @@ def main():
 			while isProcess("hammer.exe"):
 				msgLogger("Hammer is running, please close it before continuing. Press any key to retry.", type="error", blink=True)
 				runsys("pause > nul")
-				print("\x1b[A", end="")
+				print(VT100.moveVert(-1), end="")
 
 		progressBar.text = "Processing CmdSeq"
 		progressBar.step()
@@ -662,9 +666,9 @@ def main():
 		msgLogger("Installation interrupted", type="error")
 		closeScript(1)
 
-	msgLogger(f"Finished installing HammerAddons for {selectedGame}!", type="good", blink=True)
 	progressBar.text = "Done!"
 	progressBar.step()
+	msgLogger(f"Finished installing HammerAddons for {selectedGame}!", type="good", blink=True)
 	closeScript()
 
 
