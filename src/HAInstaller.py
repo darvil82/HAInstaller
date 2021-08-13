@@ -26,14 +26,14 @@ AVAILABLE_GAMES: dict[str, tuple[str, str]] = {
 	"Alien Swarm": ("asw", "swarm"),
 	"Black Mesa": ("bms", "blackmesa"),
 	"Counter-Strike Global Offensive": ("csgo", "csgo"),
-	"GarrysMod": ("gmod", "garrysmod"),
+	"GarrysMod": ("garrysmod", "gmod"),
 	"Half-Life 2": ("hl2", "hl2"),
 	"Infra": ("infra", "infra"),
 	"Left 4 Dead": ("l4d", "l4d"),
 	"Left 4 Dead 2": ("left4dead2", "left4dead2"),
 	"Portal": ("portal", "portal"),
 	"Portal 2": ("portal2", "portal2"),
-	"Team Fortress 2": ("tf", "tf2")
+	"Team Fortress 2": ("tf", "tf")
 }
 
 
