@@ -18,7 +18,7 @@ from pbar import PBar, VT100
 
 
 POSTCOMPILER_ARGS = "--propcombine $path\$file"
-VERSION = Version("1.7.3")
+VERSION = Version("1.7.3-1")
 AVAILABLE_GAMES: dict[str, tuple[str, str]] = {
 	# Game definitions. These specify the name of the main game folder, and for every game, the fgd, and the second game folder inside.
 	# Game Folder: (folder2, fgdname)
@@ -57,7 +57,7 @@ def vLog(message: str, end="\n", onlyAppend: bool = False):
 
 
 
-def msgLogger(*values: object, type: str = None, blink: bool = False, end: str = "\n"):
+def msgLogger(*values: object, type: str = None, blink: bool = False, end: str = "\n", sep: str = " "):
 	"""
 	Print a message out on the terminal.
 	@type: Available types: `good, error, loading, warning`
@@ -70,7 +70,7 @@ def msgLogger(*values: object, type: str = None, blink: bool = False, end: str =
 		"warning":  f"{VT100.color((92, 160, 2557))}[ ! ]"
 	}
 
-	strs = ' '.join(str(item) for item in values)
+	strs = sep.replace("\n", "\n      ").join(str(item) for item in values)
 	msg = f"{VT100.moveHoriz(-9999)}{VT100.underline}{MSG_PREFIX.get(type, '[   ]')}{VT100.noUnderline} {strs}{VT100.reset}{VT100.clearRight}"
 
 	if blink:
@@ -130,7 +130,7 @@ def checkUpdates():
 	try:
 		with request.urlopen(url) as data:
 			release = jsonLoads(data.read())
-			version = Version(release.get("tag_name"))
+			version = Version(release["tag_name"])
 	except Exception:
 		msgLogger("An error ocurred while checking for updates", type="error")
 		closeScript(1)
@@ -288,7 +288,7 @@ def selectGame(steamlibs: tuple) -> tuple[str, str]:
 		common = path.join(lib, "steamapps/common")
 		for game in listdir(common):
 			if game in AVAILABLE_GAMES:
-				if path.exists(path.join(common, game, AVAILABLE_GAMES.get(game)[0], "gameinfo.txt")):
+				if path.exists(path.join(common, game, AVAILABLE_GAMES[game][0], "gameinfo.txt")):
 					usingGames.append((game, lib))
 
 	if len(usingGames) == 0:
@@ -369,7 +369,11 @@ def parseCmdSeq():
 			with open(cmdSeqDefaultPath, "rb") as defCmdFile, open(cmdSeqPath, "wb") as CmdFile:
 				CmdFile.write(defCmdFile.read())
 		else:
-			msgLogger(f"Couldn't find the 'CmdSeqDefault.wc' file in the game directory '{gameBin}'.", type="error")
+			msgLogger(
+				f"Couldn't find the 'CmdSeqDefault.wc' file in the game directory '{gameBin}'.",
+				"Open the Compile dialog (F9) in Hammer to generate the file, then try again.",
+				type="error", sep="\n"
+			)
 			closeScript(1)
 
 
@@ -382,7 +386,7 @@ def parseCmdSeq():
 	cmdsFound = 0	# times we found VBSP
 	for config in data:
 		foundBsp = False
-		commands = data.get(config)
+		commands = data[config]
 
 		vLog(f"\n\tConfig: '{config}'")
 
@@ -393,7 +397,7 @@ def parseCmdSeq():
 			vLog(f"\t\tL Command:\n\t\t\tExe:      '{exeValue}'\n\t\t\tArgument: '{argValue}'")
 
 			if foundBsp:
-				if POSTCOMPILER_CMD["exe"] != exeValue:
+				if "postcompiler" not in exeValue:
 					commands.insert(index, cmdseq.Command(POSTCOMPILER_CMD["exe"], POSTCOMPILER_CMD["args"]))
 					vLog("\t--- Found VBSP, appended command ---")
 					cmdsAdded += 1
@@ -493,8 +497,8 @@ def downloadAddons():
 		versions: dict[str, str] = {}
 
 		for release in data:
-			tag = Version(release.get("tag_name"))
-			url = release.get("assets")[0].get("browser_download_url")
+			tag = Version(release["tag_name"])
+			url = release["assets"][0]["browser_download_url"]
 			versions[tag] = url
 			vLog(f"\tFound version {tag}\t('{url}')")
 
@@ -554,8 +558,8 @@ def downloadAddons():
 						vLog(f"\tExtracted file '{selectedGame}/sdk_content/maps/{file}'")
 
 				# Extract the FGD file to the bin folder
-				zipfile.extract(f"{AVAILABLE_GAMES.get(selectedGame)[1]}.fgd", path.join(gamePath, "bin/"))
-				vLog(f"\tExtracted file '{selectedGame}/bin/{AVAILABLE_GAMES.get(selectedGame)[1]}.fgd'\n\n")
+				zipfile.extract(f"{AVAILABLE_GAMES[selectedGame][1]}.fgd", path.join(gamePath, "bin/"))
+				vLog(f"\tExtracted file '{selectedGame}/bin/{AVAILABLE_GAMES[selectedGame][1]}.fgd'\n\n")
 
 
 		# Download srctools.vdf, so we can modify it to have the correct game folder inside.
@@ -641,7 +645,7 @@ def main():
 
 		selectedGame, steamPath = selectGame(steamlibs)
 		commonPath = path.join(steamPath, "steamapps/common")
-		inGameFolder = AVAILABLE_GAMES.get(selectedGame)[0]
+		inGameFolder = AVAILABLE_GAMES[selectedGame][0]
 
 		progressBar.step()
 

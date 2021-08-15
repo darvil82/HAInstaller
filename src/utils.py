@@ -5,44 +5,11 @@ from sys import exit
 
 
 __all__ = [
-	"msgLogger",
-	"closeScript",
 	"getIndent",
 	"isProcess",
 	"Version"
 ]
 
-
-
-def msgLogger(*values: object, type: str = None, blink: bool = False, end: str = "\n"):
-	"""
-	Print a message out on the terminal.
-		- Types: `good, error, loading, warning`
-	"""
-
-	MSG_PREFIX = {
-		"error":    "\x1b[91m[ E ]",
-		"good":     "\x1b[92m[ √ ]\x1b[97m",
-		"loading":  "\x1b[33m[...]",
-		"warning":  "\x1b[96m[ ! ]"
-	}
-
-	msg = f"\x1b[9999D\x1b[4m{MSG_PREFIX.get(type, '[   ]')}\x1b[24m {' '.join(str(item) for item in values)}\x1b[0m\x1b[K"
-
-	if blink:
-		print(f"\x1b[7m{msg}\x1b[27m", end="", flush=True)
-		sleep(0.25)
-
-	print(msg, end=end)
-
-
-
-
-def closeScript(errorlevel: int = 0):
-	"""Closes the script with an errorlevel"""
-
-	runsys("pause > nul")
-	exit(errorlevel)
 
 
 
