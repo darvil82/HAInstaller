@@ -49,7 +49,7 @@ class Version():
 		>>> True
 	"""
 
-	def __init__(self, version: str, seps: list = [".", "-"]) -> None:
+	def __init__(self, version: str, seps: list = (".", "-")) -> None:
 		"""
 		The string format should be something like `1.2.3` or `1.2.3-4`.
 
