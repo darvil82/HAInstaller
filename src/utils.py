@@ -103,7 +103,7 @@ class Version():
 		ver1 = first._splitted
 		ver2 = second._splitted
 
-		if not ver1[0] == ver2[0]:
+		if ver1[0] != ver2[0]:
 			# Checking main
 			ver2Main = ver2[0]
 			for number, item in enumerate(ver1[0]):
