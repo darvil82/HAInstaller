@@ -1,41 +1,254 @@
-#!/bin/python3.9
-
 """
-PBar module for displaying custom progress bars.
+PBar module for displaying custom progress bars for Python 3.9+
 
 GitHub Repository:		https://github.com/DarviL82/PBar
 """
+
+__all__ = ["PBar"]
+__author__ = "David Losantos (DarviL)"
+__version__ = "0.7.0"
 
 from typing import Any, Optional, SupportsInt, TypeVar, Union, cast, Sequence
 from os import get_terminal_size as _get_terminal_size, system as _runsys
 
 
-__all__ = ["PBar"]
-__author__ = "David Losantos (DarviL)"
-__version__ = "0.4.4"
-
-
 _runsys("")		# We need to do this, otherwise Windows won't display special VT100 sequences
 
 
-CharSetEntry = Union[str, dict[str, str]]
-CharSet = dict[str, Union[str, CharSetEntry]]
+_DEFAULT_RANGE = (0, 1)
+_DEFAULT_POS = ("center", "center")
+_DEFAULT_LEN = 20
 
-_DEFAULT_CHARSETS: dict[str, CharSet] = {
-	"empty": {
-		"empty":	" ",
-		"full":		" ",
-		"vert":		" ",
-		"horiz":	" ",
+
+Color = Optional[Union[tuple[int, int, int], str]]
+ColorSetEntry = dict[str, Color]
+CharSetEntry = dict[str, str]
+FormatSetEntry = dict[str, str]
+
+
+
+Num = TypeVar("Num", int, float)
+
+def _capValue(value: Num, max: Optional[Num] = None, min: Optional[Num] = None) -> Num:
+    """Clamp a value to a minimum and/or maximum value."""
+
+    if max is not None and value > max:
+        return max
+    elif min is not None and value < min:
+        return min
+    else:
+        return value
+
+
+
+
+def _formatError(string, start, end):
+	"""Returns a colored string across the character indices specified."""
+
+	return (
+		string[:start] +
+		VT100.UNDERLINE + VT100.color((255, 0, 0)) + string[start:end] + VT100.RESET +
+		string[end:]
+	)
+
+
+
+
+def _convertClrs(clr: Union[str, tuple, dict], type: str) -> Union[str, tuple, dict]:
+	"""Convert color values to HEX and vice-versa
+	@clr:	Color value to convert.
+	@type:	Type of conversion to do ('RGB' or 'HEX')"""
+
+	if isinstance(clr, dict):
+		endDict = {}
+		for key in clr.keys():
+			endDict[key] = _convertClrs(clr[key], type)
+		return endDict
+
+	if type == "RGB":
+		if isinstance(clr, str) and clr.startswith("#"):
+			clr = clr.lstrip("#")
+			try:
+				return tuple(int(clr[i:i+2], 16) for i in (0, 2, 4))
+			except ValueError:
+				return
+		else:
+			return clr
+
+	elif type == "HEX":
+		if not isinstance(clr, (tuple, list)) and len(clr) == 3: return clr
+
+		capped = tuple(_capValue(value, 255, 0) for value in clr)
+		return f"#{capped[0]:02x}{capped[1]:02x}{capped[2]:02x}"
+
+
+
+
+
+
+
+
+class VT100:
+	"""Class for using VT100 sequences a bit easier"""
+
+	@staticmethod
+	def pos(pos: Optional[Sequence[Any]], offset: tuple[int, int] = (0, 0)):
+		"""Position of the cursor on the terminal.
+		@pos: This tuple can contain either ints, or strings with the value `center` to specify the center of the terminal.
+		@offset: Offset applied to `pos`. (Can be negative)
+		"""
+
+		if not isinstance(pos, (tuple, list)):
+			raise TypeError("Sequence must have 3 items")
+		elif len(pos) != 2:
+			raise TypeError(f"Type of position ({type(pos)}) is not Sequence")
+
+		position = list((pos[0], pos[1]))
+		for index, value in enumerate(position):
+			if not isinstance(value, int):
+				raise TypeError(f"Invalid type {type(value)} for position value")
+
+			position[index] += offset[index]
+
+		return f"\x1b[{position[1]};{position[0]}f"
+
+
+	@staticmethod
+	def color(rgb: Optional[Sequence[int]], bg: bool = False):
+		"""Color of the cursor.
+		@rgb:	Tuple with three values from 0 to 255. (RED GREEN BLUE)
+		@bg:	This color will be displayed on the background"""
+
+		if not isinstance(rgb, (tuple, list)):
+			return ""
+		elif len(rgb) != 3:
+			raise ValueError("Sequence must have 3 items")
+
+		rgb = [_capValue(value, 255, 0) for value in rgb]
+		if bg:
+			return f"\x1b[48;2;{rgb[0]};{rgb[1]};{rgb[2]}m"
+		else:
+			return f"\x1b[38;2;{rgb[0]};{rgb[1]};{rgb[2]}m"
+
+
+
+	@staticmethod
+	def moveHoriz(pos: SupportsInt):
+		"""Move the cursor horizontally `pos` characters (supports negative numbers)."""
+		pos = int(pos)
+		if pos < 0:
+			return f"\x1b[{abs(pos)}D"
+		else:
+			return f"\x1b[{pos}C"
+
+
+	@staticmethod
+	def moveVert(pos: SupportsInt):
+		"""Move the cursor vertically `pos` lines (supports negative numbers)."""
+		pos = int(pos)
+		if pos < 0:
+			return f"\x1b[{abs(pos)}A"
+		else:
+			return f"\x1b[{pos}B"
+
+
+	# simple sequences that dont require parsing
+	RESET =			"\x1b[0m"
+	INVERT =		"\x1b[7m"
+	NO_INVERT =		"\x1b[27m"
+	CLEAR_LINE =	"\x1b[2K"
+	CLEAR_RIGHT =	"\x1b[0K"
+	CLEAR_LEFT =	"\x1b[1K"
+	CLEAR_DOWN =	"\x1b[0J"
+	CLEAR_ALL =		"\x1b[2J"
+	CURSOR_SHOW =	"\x1b[?25h"
+	CURSOR_HIDE =	"\x1b[?25l"
+	CURSOR_SAVE =	"\x1b7"
+	CURSOR_LOAD =	"\x1b8"
+	BUFFER_NEW =	"\x1b[?1049h"
+	BUFFER_OLD =	"\x1b[?1049l"
+	UNDERLINE =		"\x1b[4m"
+	NO_UNDERLINE =	"\x1b[24m"
+
+
+
+
+
+
+
+
+class _BaseSet:
+	"""Base class for all the customizable sets for the bar (colorset, charset, formatset)"""
+
+	def __init__(self, newSet: dict) -> None:
+		if isinstance(newSet, dict):
+			self._newset = self._populate(self.EMPTY | newSet)
+		else:
+			self._newset = self.DEFAULT
+
+
+	def keys(self):
+		return self._newset.keys()
+
+
+	def __getitem__(self, item) -> dict:
+		return self._newset[item]
+
+
+	def __or__(self, other):
+		new = dict(self._newset)
+		new.update(other)
+		return new
+
+
+	def __ior__(self, other):
+		dict.update(self._newset, other)
+		return self._newset
+
+
+	def __repr__(self) -> str:
+		return f"{self.__class__.__name__}({self._newset})"
+
+
+	def _populate(self, currentSet: dict) -> dict:
+		"""Return a new set with all the necessary keys for drawing the bar, making sure that no keys are missing."""
+
+		newSet = {}
+		for key in currentSet.keys():
+			currentValue = currentSet[key]
+			defaultSetValue = self.EMPTY[key]
+
+			if not isinstance(currentValue, dict) and isinstance(defaultSetValue, dict):
+				newSet[key] = {}
+				for subkey in defaultSetValue.keys():
+					newSet[key][subkey] = currentValue
+			elif isinstance(currentValue, dict):
+				newSet[key] = defaultSetValue | currentValue
+			else:
+				newSet[key] = currentValue
+
+		return newSet
+
+
+
+
+class CharSet(_BaseSet):
+	"""Container for the character sets."""
+
+	EMPTY: CharSetEntry = {
+		"empty":	"",
+		"full":		"",
+		"vert":		"",
+		"horiz":	"",
 		"corner": {
-			"tleft":	" ",
-			"tright":	" ",
-			"bleft":	" ",
-			"bright":	" "
+			"tleft":	"",
+			"tright":	"",
+			"bleft":	"",
+			"bright":	""
 		}
-	},
+	}
 
-	"normal": {
+	DEFAULT: CharSetEntry = {
 		"empty":	"░",
 		"full":		"█",
 		"vert":		"│",
@@ -46,25 +259,25 @@ _DEFAULT_CHARSETS: dict[str, CharSet] = {
 			"bleft":	"└",
 			"bright":	"┘"
 		}
-	},
+	}
 
-	"basic": {
+	BASIC: CharSetEntry = {
 		"empty":	".",
 		"full":		"#",
 		"vert":		"│"
-	},
+	}
 
-	"slim": {
+	SLIM: CharSetEntry = {
 		"empty":	"░",
 		"full":		"█"
-	},
+	}
 
-	"circles": {
+	CIRCLES: CharSetEntry = {
 		"empty":	"○",
 		"full":		"●"
-	},
+	}
 
-	"basic2": {
+	BASIC2: CharSetEntry = {
 		"empty":	".",
 		"full":		"#",
 		"vert":		"|",
@@ -75,19 +288,47 @@ _DEFAULT_CHARSETS: dict[str, CharSet] = {
 			"bleft":	"+",
 			"bright":	"+"
 		}
-	},
+	}
 
-	"full": {
+	FULL: CharSetEntry = {
 		"empty":	"█",
 		"full":		"█"
-	},
-}
+	}
 
-Color = Optional[tuple[int, int, int]]
-ColorSet = dict[str, Union[Color, dict[str, Color]]]
 
-_DEFAULT_COLORSETS: dict[str, ColorSet] = {
-	"empty": {
+	def __init__(self, newSet: CharSetEntry) -> None:
+		super().__init__(newSet)
+		self._newset = CharSet._strip(self._newset)
+
+
+	@staticmethod
+	def _strip(setdict: dict):
+		"""Converts empty values to spaces, and makes sure there's only one character"""
+		if not setdict:
+			return
+
+		newset = {}
+		for key in setdict.keys():
+			value = setdict[key]
+
+			if isinstance(value, dict):
+				value = CharSet._strip(value)
+			elif len(value) > 1:
+				value = value[0]
+			elif len(value) == 0:
+				value = " "
+
+			newset[key] = value
+
+		return newset
+
+
+
+
+class ColorSet(_BaseSet):
+	"""Container for the color sets."""
+
+	EMPTY: ColorSetEntry = {
 		"empty":	None,
 		"full":		None,
 		"vert":		None,
@@ -102,14 +343,16 @@ _DEFAULT_COLORSETS: dict[str, ColorSet] = {
 			"inside":	None,
 			"outside":	None,
 		}
-	},
+	}
 
-	"green-red": {
+	DEFAULT = EMPTY
+
+	GREEN_RED: ColorSetEntry = {
 		"empty":	(255, 0, 0),
 		"full":		(0, 255, 0)
-	},
+	}
 
-	"darvil": {
+	DARVIL: ColorSetEntry = {
 		"empty":	(0, 103, 194),
 		"full":		(15, 219, 162),
 		"vert":		(247, 111, 152),
@@ -125,238 +368,56 @@ _DEFAULT_COLORSETS: dict[str, ColorSet] = {
 			"inside":	None
 		}
 	}
-}
+
+	ERROR: ColorSetEntry = {
+		"empty":	(200, 0, 0),
+		"full":		(255, 0, 0),
+		"vert":		(255, 100, 100),
+		"horiz":	(255, 100, 100),
+		"corner": {
+			"tleft":	(255, 100, 100),
+			"tright":	(255, 100, 100),
+			"bleft":	(255, 100, 100),
+			"bright":	(255, 100, 100),
+		},
+		"text": {
+			"outside":	(255, 100, 100),
+			"inside":	None
+		}
+	}
 
 
-FormatSet = dict[str, str]
+	def __init__(self, newSet: ColorSetEntry) -> None:
+		super().__init__(_convertClrs(newSet, "RGB"))	# Convert all hex values to rgb tuples
 
-_DEFAULT_FORMATTING: dict[str, FormatSet] = {
-	"empty": {
+
+
+
+class FormatSet(_BaseSet):
+	"""Container for the formatting sets."""
+
+	EMPTY: FormatSetEntry = {
 		"inside":	"",
 		"outside":	""
-	},
-
-	"default": {
-		"inside":	"<percentage>",
-		"outside":	"<text>"
-	},
-
-	"all-out": {
-		"outside":	"<percentage>, <range>, <text>"
-	},
-
-	"all-in": {
-		"inside":	"<percentage>, <range>, <text>"
 	}
-}
 
+	DEFAULT: FormatSetEntry = {
+		"inside":	"<percentage>%",
+		"outside":	"<text>"
+	}
 
+	ALL_OUT: FormatSetEntry = {
+		"outside":	"<percentage>%, <range1>/<range2>, <text>"
+	}
 
+	ALL_IN: FormatSetEntry = {
+		"inside":	"<percentage>%, <range1>/<range2>, <text>"
+	}
 
-Num = TypeVar("Num", int, float)
-
-def _capValue(value: Num, max: Optional[Num]=None, min: Optional[Num]=None) -> Num:
-    """Clamp a value to a minimun and/or maximun value."""
-
-    if max and value > max:
-        return max
-    elif min and value < min:
-        return min
-    else:
-        return value
-
-
-
-
-
-
-
-
-class VT100():
-	"""Class for using VT100 sequences a bit easier"""
-
-	@staticmethod
-	def pos(pos: Optional[Sequence[Any]], offset: tuple[int, int] = (0, 0)):
-		"""Position of the cursor on the terminal.
-		@pos: This tuple can contain either ints, or strings with the value `center` to specify the center of the terminal.
-		@offset: Offset applied to `pos`. (Can be negative)
-		"""
-		if pos and len(pos) == 2:
-			position = list(pos)
-			for index, value in enumerate(position):
-				if isinstance(value, int):
-					value = int(value)
-					position[index] += offset[index]
-				else:
-					raise TypeError(f"Invalid type {type(value)} for position value")
-
-			return f"\x1b[{position[1]};{position[0]}f"
-		else:
-			return ""
-
-	@staticmethod
-	def color(rgb: Optional[Sequence[int]], bg: bool = False):
-		"""Color of the cursor.
-		@rgb:	Tuple with three values from 0 to 255. (RED GREEN BLUE)
-		@bg:	This color will be displayed on the background"""
-		if rgb and len(rgb) == 3:
-			rgb = [_capValue(value, 255, 0) for value in rgb]
-			if bg:
-				return f"\x1b[48;2;{rgb[0]};{rgb[1]};{rgb[2]}m"
-			else:
-				return f"\x1b[38;2;{rgb[0]};{rgb[1]};{rgb[2]}m"
-
-		else:
-			return ""
-
-	@staticmethod
-	def moveHoriz(pos: SupportsInt):
-		"""Move the cursor horizontally `pos` characters (supports negative numbers)."""
-		pos = int(pos)
-		if pos < 0:
-			return f"\x1b[{abs(pos)}D"
-		else:
-			return f"\x1b[{pos}C"
-
-	@staticmethod
-	def moveVert(pos: SupportsInt):
-		"""Move the cursor vertically `pos` lines (supports negative numbers)."""
-		pos = int(pos)
-		if pos < 0:
-			return f"\x1b[{abs(pos)}A"
-		else:
-			return f"\x1b[{pos}B"
-
-	# simple sequences that dont require parsing
-	reset = "\x1b[0m"
-	invert = "\x1b[7m"
-	noInvert = "\x1b[27m"
-	clearLine = "\x1b[2K"
-	clearRight = "\x1b[0K"
-	clearLeft = "\x1b[1K"
-	clearDown = "\x1b[0J"
-	cursorShow = "\x1b[?25h"
-	cursorHide = "\x1b[?25l"
-	cursorSave = "\x1b7"
-	cursorLoad = "\x1b8"
-	bufferNew = "\x1b[?1049h"
-	bufferOld = "\x1b[?1049l"
-	underline = "\x1b[4m"
-	noUnderline = "\x1b[24m"
-
-
-
-
-
-
-
-
-def _getCharset(charset: Any) -> CharSet:
-		"""Return a full valid character set"""
-
-		def stripCharset(charset: CharSet) -> CharSet:
-			"""Converts empty values to spaces, and makes sure there's only one character"""
-			newset = dict({})
-			for key in charset.keys():
-				value = charset[key]
-
-				if isinstance(value, dict):
-					value = stripCharset(value)
-				elif len(value) > 1:
-					value = value[0]
-				elif len(value) == 0:
-					value = " "
-
-				newset[key] = value
-			return newset
-
-
-		if charset:
-			if isinstance(charset, str):
-				# it is a string, so we just get the default character set with that name
-				charset = _DEFAULT_CHARSETS.get(charset, _DEFAULT_CHARSETS["normal"])
-			elif isinstance(charset, dict):
-				# it is a dict
-				charset = stripCharset(charset)
-
-				if "corner" in charset.keys():
-					if isinstance(charset["corner"], str):	# this is only a str, so we just make all corners the value of this str
-						charset["corner"] = {
-							"tleft":	charset["corner"],
-							"tright":	charset["corner"],
-							"bleft":	charset["corner"],
-							"bright":	charset["corner"]
-						}
-					elif isinstance(charset["corner"], dict):
-						charset["corner"] = _DEFAULT_CHARSETS["empty"]["corner"] | charset["corner"]	# Merge corners into default dict
-			else:
-				raise ValueError(f"Invalid type ({type(charset)}) for charset")
-
-			set: CharSet = _DEFAULT_CHARSETS["empty"] | charset		# merge charset into default dict
-		else:
-			set = _DEFAULT_CHARSETS["normal"]
-
-		return set
-
-
-
-
-def _getColorset(colorset: Any) -> ColorSet:
-		"""Return a full valid color set"""
-		if colorset:
-			if isinstance(colorset, str):
-				colorset = _DEFAULT_COLORSETS.get(colorset, _DEFAULT_COLORSETS["empty"])
-			elif isinstance(colorset, dict):
-				if "corner" in colorset.keys():
-					if isinstance(colorset["corner"], (tuple, list)):
-						colorset["corner"] = {
-							"tleft": 	colorset["corner"],
-							"tright": 	colorset["corner"],
-							"bleft": 	colorset["corner"],
-							"bright": 	colorset["corner"]
-						}
-					elif isinstance(colorset["corner"], dict):
-						colorset["corner"] = _DEFAULT_COLORSETS["empty"]["corner"] = colorset["corner"]
-					else:
-						raise ValueError(f"Invalid type ({type(colorset['corner'])}) for colorset")
-
-				if "text" in colorset.keys():
-					if isinstance(colorset["text"], (tuple, list)):
-						colorset["text"] = {
-							"inside":	colorset["text"],
-							"outside":	colorset["text"]
-						}
-					elif isinstance(colorset["text"], dict):
-						colorset["text"] = _DEFAULT_COLORSETS["empty"]["text"] | colorset["text"]
-					else:
-						raise ValueError(f"Invalid type ({type(colorset['text'])}) for colorset")
-
-			else:
-				raise ValueError(f"Invalid type ({type(colorset)}) for colorset")
-
-			set: ColorSet = _DEFAULT_COLORSETS["empty"] | colorset
-		else:
-			set = _DEFAULT_COLORSETS["empty"]
-
-		return set
-
-
-
-
-def _getFormat(formatset: Any) -> FormatSet:
-		"""Return a full valid formatting set"""
-		if formatset:
-			if isinstance(formatset, str):
-				formatset = _DEFAULT_FORMATTING.get(formatset, _DEFAULT_FORMATTING["empty"])
-			elif isinstance(formatset, dict):
-				pass
-			else:
-				raise ValueError(f"Invalid type ({type(formatset)}) for formatset")
-			set: FormatSet = _DEFAULT_FORMATTING["empty"] | formatset
-		else:
-			set = _DEFAULT_FORMATTING["default"]
-
-		return set
+	MIXED: FormatSetEntry = {
+		"inside":	"<percentage>%",
+		"outside":	"<text>: (<range1>/<range2>)"
+	}
 
 
 
@@ -367,15 +428,15 @@ def _getFormat(formatset: Any) -> FormatSet:
 
 class PBar():
 	"""
-	# pBar - Progress bar
+	# PBar - Progress bar
 
-	pBar is an object for managing progress bars in python.
+	PBar is an object for managing progress bars in python.
 
 	---
 
 	## Initialization
 
-	>>> mybar = pBar()
+	>>> mybar = PBar()
 
 	- A progress bar will be initialized with all the default values. For customization, use the arguments or the properties available.
 
@@ -398,19 +459,21 @@ class PBar():
 	- mybar.colorset
 	- mybar.format
 	- mybar.enabled
+	- mybar.config
 	"""
 	def __init__(self,
-			range: tuple[int, int] = (0, 1),
+			range: tuple[int, int] = None,
 			text: str = "",
-			length: int = 20,
-			charset: Union[None, str, dict[str, str]] = None,
-			colorset: Union[None, str, dict[str, tuple[int, int, int]]] = None,
-			position: Union[None, str, tuple[int, int]] = ("center", "center"),
-			format: Union[None, str, dict[str, str]] = None
+			length: int = None,
+			position: Union[str, tuple[int, int]] = None,
+			charset: Optional[CharSetEntry] = None,
+			colorset: Optional[ColorSetEntry] = None,
+			format: Optional[FormatSetEntry] = None,
+			inherit: "PBar" = None
 		) -> None:
 		"""
 		### Detailed descriptions:
-		@range: This tuple will specify the range of two values to display in the progress bar.
+		@range: This tuple will specify the range of two values to display in the progress bar. Default value is `(0, 1)`.
 
 		---
 
@@ -418,13 +481,15 @@ class PBar():
 
 		---
 
-		@length: Intenger that specifies how long the bar will be.
+		@length: Intenger that specifies how long the bar will be. Default value is `20`.
 
 		---
 
 		@charset: Set of characters to use when drawing the progress bar.
-		This value can either be a string which will specify a default character set to use, or a dictionary, which should specify the custom characters:
-		- Available default character sets: `empty`, `normal`, `basic`, `basic2`, `slim`, `circles` and `full`.
+
+		To use one of the included sets, use any of the constant values in `pbar.CharSet`.
+
+		Since this value is just a dictionary, it is possible to use custom sets, which should specify the custom characters:
 		- Custom character set dictionary:
 
 				![image](https://user-images.githubusercontent.com/48654552/127887419-acee1b4f-de1b-4cc7-a1a6-1be75c7f97c9.png)
@@ -434,25 +499,31 @@ class PBar():
 		---
 
 		@colorset: Set of colors to use when drawing the progress bar.
-		This value can either be a string which will specify a default character set to use, or a dictionary, which should specify the custom characters:
-		- Available default color sets: `empty`, `green-red` and `darvil`.
+
+		To use one of the included sets, use any of the constant values in `pbar.ColorSet`.
+
+		Since this value is just a dictionary, it is possible to use custom sets, which should specify the custom colors:
 		- Custom color set dictionary:
 
 				![image](https://user-images.githubusercontent.com/48654552/127904550-15001058-cbf2-4ebf-a543-8d6566e9ef36.png)
 
 			Note: It is not needed to specify all the keys and values.
 
+			Note: The colors can also be specified as HEX in a string.
+
 		---
 
 		@position: Tuple containing the position (X and Y axles of the center) of the progress bar on the terminal.
-		If a value is `center`, the bar will be positioned at the center of the terminal on that axis.
+		If a value is `center`, the bar will be positioned at the center of the terminal on that axis. Default value is `("center", "center")`
 
 		---
 
 		@format: Formatting used when displaying the values inside and outside the bar.
-		This value can either be a string which will specify a default formatting set to use, or a dictionary, which should specify the custom formats:
-		- Available default formatting sets: `empty`, `default`, `all-out` and `all-in`.
-		- Custom color set dictionary:
+
+		To use one of the included sets, use any of the constant values in `pbar.FormatSet`.
+
+		Since this value is just a dictionary, it is possible to use custom sets, which should specify the custom formatting:
+		- Custom formatset dictionary:
 
 				![image](https://user-images.githubusercontent.com/48654552/127889950-9b31d7eb-9a52-442b-be7f-8b9df23b15ae.png)
 
@@ -460,24 +531,40 @@ class PBar():
 
 		- Available formatting keys:
 			- `<percentage>`
-			- `<range>`
-				- `<range1>`
-				- `<range2>`
+			- `<range1>`
+			- `<range2>`
 			- `<text>`
+
+		---
+
+		@inherit: Inherits all properties from the PBar object specified.
 		"""
 		self._requiresClear = False
 		self._enabled = True
 
-		self._range = list(range)
+		self._range = list(PBar._getRange(range))
 		self._text = str(text)
-		self._format = _getFormat(format)
-		self._length = self._getLength(length)
-		self._charset = _getCharset(charset)
-		self._colorset = _getColorset(colorset)
+		self._format = FormatSet(format)
+		self._length = PBar._getLength(length)
+		self._charset = CharSet(charset)
+		self._colorset = ColorSet(colorset)
 		self._pos = self._getPos(position)
 
 		self._oldValues = [self._pos, self._length]
-		# self._draw()
+
+		if inherit:
+			if not isinstance(inherit, PBar):
+				raise TypeError(f"Type {type(inherit)} is not a PBar object")
+
+			self.config = inherit.config	# Get config from the object to inherit from, and apply it to ours
+			if range:		self.range = range
+			if text:		self.text = text
+			if format:		self.format = format
+			if length:		self.length = length
+			if charset:		self.charset = charset
+			if colorset:	self.colorset = colorset
+			if position:	self.position = position
+
 
 
 
@@ -491,8 +578,7 @@ class PBar():
 
 	def step(self, steps: int = 1):
 		"""Add `steps` to the first value in range, then draw the bar"""
-		if not self._range[0] >= self._range[1]:
-			self._range[0] += _capValue(steps, self._range[1] - self._range[0])
+		self.range = (self._range[0] + steps, self._range[1])
 		self._draw()
 
 
@@ -513,44 +599,44 @@ class PBar():
 		return self._text
 	@text.setter
 	def text(self, text: str):
-		self._text = self._parseFormat(text)
+		self._text = str(text)
 		self._requiresClear = True
 
 
 	@property
 	def range(self) -> tuple[int, int]:
 		"""Range for the bar progress"""
-		return self._range[0], self._range[1]
+		return (self._range[0], self._range[1])
 	@range.setter
 	def range(self, range: tuple[int, int]):
-		self._range = list(range)
+		self._range = list(PBar._getRange(range))
 
 
 	@property
-	def charset(self) -> CharSet:
+	def charset(self) -> CharSetEntry:
 		"""Set of characters for the bar"""
 		return self._charset
 	@charset.setter
 	def charset(self, charset: Any):
-		self._charset = _getCharset(charset)
+		self._charset = CharSet(charset)
 
 
 	@property
-	def colorset(self) -> ColorSet:
+	def colorset(self) -> ColorSetEntry:
 		"""Set of colors for the bar"""
 		return self._colorset
 	@colorset.setter
 	def colorset(self, colorset: Any):
-		self._colorset = _getColorset(colorset)
+		self._colorset = ColorSet(colorset)
 
 
 	@property
-	def format(self):
+	def format(self) -> FormatSetEntry:
 		"""Formatting used for the bar"""
 		return self._format
 	@format.setter
 	def format(self, format: Any):
-		self._format = _getFormat(format)
+		self._format = FormatSet(format)
 
 
 	@property
@@ -559,7 +645,7 @@ class PBar():
 		return self._length
 	@length.setter
 	def length(self, length: int):
-		newlen = self._getLength(length)
+		newlen = PBar._getLength(length)
 		if newlen < self._length:
 			self._requiresClear = True		# since the bar is gonna be smaller, we need to redraw it.
 		self._oldValues[1] = self._length
@@ -577,7 +663,7 @@ class PBar():
 		if newpos != self._pos:
 			self._oldValues[0] = self._pos
 			self._requiresClear = True		# Position has been changed, we need to clear the bar at the old position
-			self._pos = self._getPos(position)
+			self._pos = newpos
 
 
 	@property
@@ -587,6 +673,28 @@ class PBar():
 	@enabled.setter
 	def enabled(self, state: bool):
 		self._enabled = state
+
+
+	@property
+	def config(self) -> dict:
+		"""All the values of the progress bar stored in a dict"""
+		return {
+			"range":	self._range,
+			"text":		self._text,
+			"length":	self._length,
+			"position":	self._pos,
+			"charset":	self._charset,
+			"colorset":	_convertClrs(self._colorset, "HEX"),
+			"format":	self._format,
+			"enabled":	self._enabled
+		}
+	@config.setter
+	def config(self, config: dict[str, Any]):
+		if isinstance(config, dict):
+			for key in {"range", "text", "length", "position", "charset", "colorset", "format", "enabled"}:
+				# Move through every key in the dict and populate the config of the class with its values
+				if key in config.keys(): setattr(self, key, config[key])
+
 
 	# --------- ///////////////////////////////////////// ----------
 
@@ -623,60 +731,92 @@ class PBar():
 
 	def _getPos(self, position: Optional[Sequence[Any]]) -> tuple[int, int]:
 		"""Get and process new position requested"""
-		if position and len(position) == 2:
-			newpos = []
-			tSize: tuple[int, int] = _get_terminal_size()
+		if not position:
+			position = _DEFAULT_POS
+		elif not isinstance(position, (tuple, list)):
+			raise TypeError(f"Type of position ({type(position)}) is not Sequence")
 
-			if isinstance(position, (tuple, list)):
-				for index, value in enumerate(position):
-					if isinstance(value, str) and value == "center":
-						value = int(tSize[index] / 2)
-					elif isinstance(value, (int, float)):
-						if index == 0:
-							value = _capValue(value, tSize[0] - self._length / 2 + 2, self._length / 2 + 2)
-						else:
-							value = _capValue(value, tSize[1] - 3, 1)
+		newpos = []
+		tSize: tuple[int, int] = _get_terminal_size()
 
-						value = int(value)
-					else:
-						raise Exception(f"Invalid position value type ({type(value)})")
-					newpos.append(value)
-				return newpos
-		else:
-			raise ValueError("Position must be a Sequence")
+		for index, value in enumerate(position):
+			if value == "center":
+				value = int(tSize[index] / 2)
+			elif not isinstance(value, (int, float)):
+				raise TypeError(f"Type of value {value} ({type(value)}) is not valid")
 
+			if index == 0:
+				value = _capValue(value, tSize[0] - self._length / 2 + 2, self._length / 2 + 2)
+			else:
+				value = _capValue(value, tSize[1] - 3, 1)
 
+			value = int(value)
+			newpos.append(value)
+		return newpos
 
 
-	def _getLength(self, length: int):
+
+
+	@staticmethod
+	def _getLength(length: int):
 		"""Get and process new length requested"""
+		if length is None:
+			return _DEFAULT_LEN
+
 		tSize: tuple[int, int] = _get_terminal_size()
 		return _capValue(length, tSize[0] - 5, 5)
 
 
 
 
+	@staticmethod
+	def _getRange(range: tuple[int, int]) -> tuple[int, int]:
+		"""Return a capped range"""
+		if not range:
+			return _DEFAULT_RANGE
+		elif not isinstance(range, (tuple, list)):
+			raise TypeError(f"Type of value '{range}' ({type(range)}) is not a tuple/list")
+
+		for item in range:
+			if not isinstance(item, int):
+				raise TypeError(f"Type of value '{item}' ({type(item)}) in range is not int")
+
+		if len(range) == 2:
+			value1 = _capValue(range[0], range[1], 0)
+			value2 = _capValue(range[1], min=1)
+			return (value1, value2)
+		else:
+			raise ValueError("Length of sequence is not 2")
+
+
+
+
+
 	def _parseFormat(self, string: str) -> str:
 		"""Parse a string that may contain formatting keys"""
+		if string is None: return ""
+		ignoreChars = "\x1b\n\r\b\a\f\v"	# Ignore this characters entirely
+		text = ""							# string supplied without "poison" characters
+
+		# Remove "dangerous" characters and convert some
+		for char in str(string):
+			if char not in ignoreChars:
+				if char == "\t":
+					# Convert tabs to spaces because otherwise we can't tell the length of the string properly
+					char = "    "
+				text += char
+
 		foundOpen = False		# Did we find a '<'?
 		foundBackslash = False	# Did we find a '\'?
-		ignoreChars = "\x1b"	# Ignore this characters entirely
 		tempStr = ""			# String that contains the current value inside < >
 		endStr = ""				# Final string that will be returned
 
-		for char in str(string):
-			if char in ignoreChars:
-				continue
-			elif char == "\t":
-				# Convert tabs to spaces because otherwise we can't
-				# tell the length of the string properly
-				endStr += "    "
-				continue
-
+		# Convert the keys to a final string
+		for index, char in enumerate(text):
 			if foundBackslash:
 				# Also skip the character next to the slash
-				endStr += char
 				foundBackslash = False
+				endStr += char
 				continue
 			elif char == "\\":
 				# Found backslash, skip it
@@ -688,9 +828,7 @@ class PBar():
 				if char == ">":
 					# Found '>'. Now just add the formatting keys.
 					if tempStr == "percentage":
-						endStr += f"{self.percentage}%"
-					elif tempStr == "range":
-						endStr += f"{self._range[0]}/{self._range[1]}"
+						endStr += str(self.percentage)
 					elif tempStr == "range1":
 						endStr += str(self._range[0])
 					elif tempStr == "range2":
@@ -704,7 +842,7 @@ class PBar():
 							else:
 								endStr += self._parseFormat(self._text)	# We want to parse the text too, because it can also have keys or other characters
 					else:
-						raise ValueError(f"Unknown formatting key '{tempStr}'")
+						raise RuntimeError(f"Unknown formatting key ('{_formatError(text, index - len(tempStr), index)}')")
 
 					foundOpen = False
 					tempStr = ""
@@ -716,6 +854,10 @@ class PBar():
 			else:
 				# It is just a normal character that doesn't belong to any formatting key, so just append it to the end string.
 				endStr += char
+
+			if index + 1 == len(text):
+				# This is the last character, so add the temp str to the final string
+				endStr += tempStr
 
 		return endStr
 
@@ -735,13 +877,13 @@ class PBar():
 		middle = VT100.pos(pos, (centerOffset, 1)) + " " * (length + 5 + len(self._parseFormat(self._format["outside"])))
 		bottom = VT100.pos(pos, (centerOffset, 2)) + " " * (length + 4)
 
-		print(VT100.cursorSave + top, middle, bottom, VT100.cursorLoad, sep="\n", end="")
+		print(VT100.CURSOR_SAVE, top, middle, bottom, VT100.CURSOR_LOAD, sep="", end="", flush=True)
 
 
 
 
 	def _draw(self):
-		"""Draw the progress bar. clearAll will clear the lines used by the bar."""
+		"""Draw the progress bar"""
 
 		if not self._enabled: return
 
@@ -757,9 +899,9 @@ class PBar():
 
 		# Build all the parts of the progress bar
 		def buildTop() -> str:
-			left = VT100.color(self._colorsetCorner["tleft"]) + self._charsetCorner["tleft"] + VT100.reset
-			middle = VT100.color(self._color("horiz")) + self._char("horiz") * (self._length + 2) + VT100.reset
-			right = VT100.color(self._colorsetCorner["tleft"]) + self._charsetCorner["tright"] + VT100.reset
+			left = VT100.color(self._colorsetCorner["tleft"]) + self._charsetCorner["tleft"] + VT100.RESET
+			middle = VT100.color(self._color("horiz")) + self._char("horiz") * (self._length + 2) + VT100.RESET
+			right = VT100.color(self._colorsetCorner["tright"]) + self._charsetCorner["tright"] + VT100.RESET
 
 			return VT100.pos(self._pos, (centerOffset, 0)) + left + middle + right
 
@@ -769,12 +911,12 @@ class PBar():
 			segmentsFull = segments
 			segmentsEmpty = self._length - segmentsFull
 
-			vert = VT100.color(self._color("vert")) + self._char("vert") + VT100.reset
-			middle = VT100.color(self._color("full")) + self._char("full") * segmentsFull + VT100.reset + VT100.color(self._color("empty")) + self._char("empty") * segmentsEmpty + VT100.reset
+			vert = VT100.color(self._color("vert")) + self._char("vert") + VT100.RESET
+			middle = VT100.color(self._color("full")) + self._char("full") * segmentsFull + VT100.RESET + VT100.color(self._color("empty")) + self._char("empty") * segmentsEmpty + VT100.RESET
 
 			# ---------- Build the content outside the bar ----------
 			extra = self._parseFormat(self._format["outside"])
-			extraFormatted = VT100.clearRight + VT100.color(self._colorsetText["outside"]) + extra + VT100.reset
+			extraFormatted = VT100.CLEAR_RIGHT + VT100.color(self._colorsetText["outside"]) + extra + VT100.RESET
 
 
 			# ---------- Build the content inside the bar ----------
@@ -786,14 +928,14 @@ class PBar():
 
 
 			if self.percentage < 50:
-				if self._charset["empty"] == "█":	infoFormatted += VT100.invert
+				if self._charset["empty"] == "█":	infoFormatted += VT100.INVERT
 				if not self._colorsetText["inside"]:	infoFormatted += VT100.color(self._color("empty"))
 			else:
-				if self._charset["full"] == "█":	infoFormatted += VT100.invert
+				if self._charset["full"] == "█":	infoFormatted += VT100.INVERT
 				if not self._colorsetText["inside"]:	infoFormatted += VT100.color(self._color("full"))
 
 
-			infoFormatted += info + VT100.reset
+			infoFormatted += info + VT100.RESET
 			# ---------- //////////////////////////////// ----------
 
 			return (
@@ -803,9 +945,9 @@ class PBar():
 
 
 		def buildBottom() -> str:
-			left = VT100.color(self._colorsetCorner["bleft"]) + self._charsetCorner["bleft"] + VT100.reset
-			middle = VT100.color(self._color("horiz")) + self._char("horiz") * (self._length + 2) + VT100.reset
-			right = VT100.color(self._colorsetCorner["bright"]) + self._charsetCorner["bright"] + VT100.reset
+			left = VT100.color(self._colorsetCorner["bleft"]) + self._charsetCorner["bleft"] + VT100.RESET
+			middle = VT100.color(self._color("horiz")) + self._char("horiz") * (self._length + 2) + VT100.RESET
+			right = VT100.color(self._colorsetCorner["bright"]) + self._charsetCorner["bright"] + VT100.RESET
 
 			return VT100.pos(self._pos, (centerOffset, 2)) + left + middle + right
 
@@ -813,87 +955,13 @@ class PBar():
 
 		# Draw the bar
 		print(
-			VT100.cursorSave + buildTop(),
+			VT100.CURSOR_SAVE,
+			buildTop(),
 			buildMid(),
 			buildBottom(),
-			VT100.cursorLoad,
+			VT100.CURSOR_LOAD,
 
-			sep="\n",
-			end=""
+			sep="", end="", flush=True
 		)
 
 		self._requiresClear = False
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-if __name__ == "__main__":
-	from time import sleep
-
-	mybar = PBar(
-		range=(0, 25),
-		text="Loading... <text>",
-		charset="normal",
-		colorset="darvil",
-		length=25,
-		format={"inside": "<text>", "outside": "<range1> of <range2>"}
-	)
-
-	print("Drawing bar...", end="")
-
-	try:
-		pos = 1
-		while mybar.percentage < 100:
-			pos += 1.5
-			sleep(0.1)
-			mybar.colorset |= {
-				"full":		(0, mybar.percentage * 2, 100),
-				"empty":	(0, 100, 255 - mybar.percentage * 2)
-			}
-			# mybar.length = 120 - mybar.percentage
-			# mybar.position = (pos + 20, pos / 2)
-			mybar.step()
-
-		else:
-			mybar.text = "Done!"
-			mybar.colorset |= {"text": {"outside":		(0, 200, 100)}}
-
-	except KeyboardInterrupt:
-		mybar.text = "Canceled!"
-		mybar.colorset = {
-			"empty":	(150, 0, 0),
-			"full":		(255, 100, 100),
-			"corner":	(255, 0, 0),
-			"vert":		(255, 0, 0),
-			"horiz":	(255, 0, 0),
-			"text":		(255, 200, 200)
-		}
-		mybar.format |= {"inside":	"You pressed Ctrl-C"}
-
-	try:
-		mybar.draw()
-		sleep(2)
-	except KeyboardInterrupt:
-		pass
-	mybar.clear()
-
-	print(" Finished!")

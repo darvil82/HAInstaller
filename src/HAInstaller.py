@@ -12,7 +12,8 @@ from sys import exit
 from platform import architecture
 
 from utils import getIndent, isProcess, Version
-from pbar import PBar, VT100
+from pbar import VT100
+import pbar
 
 
 
@@ -71,10 +72,10 @@ def msgLogger(*values: object, type: str = None, blink: bool = False, end: str =
 	}
 
 	strs = sep.replace("\n", "\n      ").join(str(item) for item in values)
-	msg = f"{VT100.moveHoriz(-9999)}{VT100.underline}{MSG_PREFIX.get(type, '[   ]')}{VT100.noUnderline} {strs}{VT100.reset}{VT100.clearRight}"
+	msg = f"{VT100.moveHoriz(-9999)}{VT100.UNDERLINE}{MSG_PREFIX.get(type, '[   ]')}{VT100.NO_UNDERLINE} {strs}{VT100.RESET}{VT100.CLEAR_RIGHT}"
 
 	if blink:
-		print(f"{VT100.underline}{msg}{VT100.noUnderline}", end="", flush=True)
+		print(f"{VT100.UNDERLINE}{msg}{VT100.NO_UNDERLINE}", end="", flush=True)
 		sleep(0.25)
 
 	sleep(0.15)
@@ -110,7 +111,7 @@ def closeScript(errorlevel: int = 0):
 	"""Closes the script with an errorlevel"""
 
 	runsys("pause > nul")
-	print(VT100.bufferOld, end="")
+	print(VT100.BUFFER_OLD, end="")
 	vLog("Script terminated\n\n\n\n", onlyAppend=True)
 	exit(errorlevel)
 
@@ -156,8 +157,8 @@ def parseArgs():
 			Using version {VERSION}
 
 			Repositories:
-				HAInstaller:    {VT100.underline}https://github.com/DarviL82/HAInstaller{VT100.noUnderline}
-				HammerAddons:   {VT100.underline}https://github.com/TeamSpen210/HammerAddons{VT100.noUnderline}
+				HAInstaller:    {VT100.UNDERLINE}https://github.com/DarviL82/HAInstaller{VT100.NO_UNDERLINE}
+				HammerAddons:   {VT100.UNDERLINE}https://github.com/TeamSpen210/HammerAddons{VT100.NO_UNDERLINE}
 			"""
 		),
 		formatter_class=argparse.RawTextHelpFormatter
@@ -325,12 +326,12 @@ def selectGame(steamlibs: tuple) -> tuple[str, str]:
 				raise ValueError
 
 			# The value is correct, so we move the cursor up the same number of lines taken by the menu to drawn, so then we can override it
-			print(VT100.moveVert(-len(usingGames) - 2) + VT100.clearDown, end="")
+			print(VT100.moveVert(-len(usingGames) - 2) + VT100.CLEAR_DOWN, end="")
 			msgLogger(f"Selected game '{usingGames[usrInput - 1][0]}'", type="good")
 			return tuple(usingGames[usrInput - 1])
 		except (ValueError, IndexError):
 			# If the value isn't valid, we move the terminal cursor up and then clear the line. This is done to not cause ugly spam when typing values
-			print(VT100.moveVert(-1) + VT100.clearLine, end="")
+			print(VT100.moveVert(-1) + VT100.CLEAR_LINE, end="")
 
 
 
@@ -630,10 +631,10 @@ def main():
 	parseArgs()
 	isSysX64 = "64" in architecture()[0]
 
-	progressBar = PBar(range=(0, 6), position=(23, 4), text="Preparing...")
+	progressBar = pbar.PBar(range=(0, 6), position=(23, 4), text="Preparing...")
 	progressBar.enabled = not args.noPbar and not args.verbose
 
-	print(f"{VT100.bufferNew}\n{VT100.color((0, 255, 255))}{VT100.underline}TeamSpen's Hammer Addons Installer - v{VERSION}{VT100.reset}\n")
+	print(f"{VT100.BUFFER_NEW}\n{VT100.color((0, 255, 255))}{VT100.UNDERLINE}TeamSpen's Hammer Addons Installer - v{VERSION}{VT100.RESET}\n")
 	if progressBar.enabled: print("\n\n\n")
 
 	progressBar.draw()
