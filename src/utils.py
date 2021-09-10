@@ -67,11 +67,7 @@ class Version():
 	def _strip(self, string: str) -> str:
 		"""Remove any character from string which isn't a number, or any of the separators"""
 
-		endStr = ""
-		for char in string:
-			if char.isdigit() or char in ".-":
-				endStr += char
-				continue
+		endStr = "".join(char for char in string if char.isdigit() or char in ".-")
 
 		if endStr == "" or ".." in endStr:
 			return "0"
@@ -103,22 +99,20 @@ class Version():
 		ver1 = first._splitted
 		ver2 = second._splitted
 
-		if ver1[0] != ver2[0]:
-			# Checking main
-			ver2Main = ver2[0]
-			for number, item in enumerate(ver1[0]):
-				if len(ver2Main) == number:
-					return True
-				elif item > ver2Main[number]:
-					return True
-				elif item < ver2Main[number]:
-					return False
-				elif item == ver2Main[number]:
-					continue
-			return False
-		else:
+		if ver1[0] == ver2[0]:
 			# Checking the second value
 			return ver1[1] > ver2[1]
+
+		# Checking main
+		ver2Main = ver2[0]
+		for number, item in enumerate(ver1[0]):
+			if len(ver2Main) == number or item > ver2Main[number]:
+				return True
+			elif item < ver2Main[number]:
+				return False
+			elif item == ver2Main[number]:
+				continue
+		return False
 
 
 	def __gt__(self, other) -> bool:

@@ -196,25 +196,21 @@ def getSteamPath() -> tuple[str]:
 	def checkPath(foldername: str) -> bool:
 		"""Check if the filepath supplied is valid and actually contains Steam."""
 
-		# All the files that the main Steam path should contain
-		STEAM_CONTENTS = {
-			'crashhandler.dll', 'crashhandler64.dll', 'CSERHelper.dll', 'd3dcompiler_46.dll', 'd3dcompiler_46_64.dll', 'GameOverlayRenderer.dll', 'GameOverlayRenderer64.dll',
-			'GfnRuntimeSdk.dll', 'icui18n.dll', 'icuuc.dll', 'openvr_api.dll', 'SDL2.dll', 'SDL2_ttf.dll', 'Steam.dll', 'Steam2.dll', 'steamclient.dll', 'steamclient64.dll',
-			'SteamOverlayVulkanLayer.dll', 'SteamOverlayVulkanLayer64.dll', 'SteamUI.dll', 'steamwebrtc.dll', 'steamwebrtc64.dll', 'tier0_s.dll', 'tier0_s64.dll', 'v8.dll', 'video.dll',
-			'VkLayer_steam_fossilize.dll', 'VkLayer_steam_fossilize64.dll', 'GameOverlayUI.exe', 'steam.exe', 'steamerrorreporter.exe', 'steamerrorreporter64.exe','streaming_client.exe',
-			'uninstall.exe', 'WriteMiniDump.exe'
-		}
-
 		# Check if the path supplied is actually the true Steam path by checking if it contains every file in STEAM_CONTENTS
 		if path.isdir(foldername):
 			dirLS = listdir(foldername)
-			missingFiles = []
+			# All the files that the main Steam path should contain
+			STEAM_CONTENTS = {
+				'crashhandler.dll', 'crashhandler64.dll', 'CSERHelper.dll', 'd3dcompiler_46.dll', 'd3dcompiler_46_64.dll', 'GameOverlayRenderer.dll', 'GameOverlayRenderer64.dll',
+				'GfnRuntimeSdk.dll', 'icui18n.dll', 'icuuc.dll', 'openvr_api.dll', 'SDL2.dll', 'SDL2_ttf.dll', 'Steam.dll', 'Steam2.dll', 'steamclient.dll', 'steamclient64.dll',
+				'SteamOverlayVulkanLayer.dll', 'SteamOverlayVulkanLayer64.dll', 'SteamUI.dll', 'steamwebrtc.dll', 'steamwebrtc64.dll', 'tier0_s.dll', 'tier0_s64.dll', 'v8.dll', 'video.dll',
+				'VkLayer_steam_fossilize.dll', 'VkLayer_steam_fossilize64.dll', 'GameOverlayUI.exe', 'steam.exe', 'steamerrorreporter.exe', 'steamerrorreporter64.exe','streaming_client.exe',
+				'uninstall.exe', 'WriteMiniDump.exe'
+			}
 
-			for file in STEAM_CONTENTS:
-				if file not in dirLS:
-					missingFiles.append(file)
+			missingFiles = [file for file in STEAM_CONTENTS if file not in dirLS]
 
-			if len(missingFiles) >= 1:
+			if missingFiles:
 				vLog(f"\tDirectory '{foldername}' is missing the next file/s: '" + "', '".join(missingFiles) + "'")
 				msgLogger(f"The directory '{foldername}' isn't a valid Steam directory. (Missing {len(missingFiles)} file/s.)", type="error")
 				return False
@@ -288,11 +284,11 @@ def selectGame(steamlibs: tuple) -> tuple[str, str]:
 	for lib in steamlibs:
 		common = path.join(lib, "steamapps/common")
 		for game in listdir(common):
-			if game in AVAILABLE_GAMES:
-				if path.exists(path.join(common, game, AVAILABLE_GAMES[game][0], "gameinfo.txt")):
-					usingGames.append((game, lib))
+			if game in AVAILABLE_GAMES and path.exists(
+					path.join(common, game, AVAILABLE_GAMES[game][0], "gameinfo.txt")):
+				usingGames.append((game, lib))
 
-	if len(usingGames) == 0:
+	if not usingGames:
 		# No supported games found, quitting
 		msgLogger("Couldn't find any game supported by HammerAddons", type="error")
 		closeScript(1)
@@ -350,10 +346,7 @@ def parseCmdSeq():
 	cmdSeqDefaultPath = path.join(gameBin, "CmdSeqDefault.wc")
 
 	if Version(args.version) >= Version("2.4.0") or args.version == "latest":
-		if isSysX64:
-			compFolder = "postcompiler_win64"
-		else:
-			compFolder = "postcompiler_win32"
+		compFolder = "postcompiler_win64" if isSysX64 else "postcompiler_win32"
 	else:
 		compFolder = "postcompiler"
 
@@ -402,12 +395,11 @@ def parseCmdSeq():
 					commands.insert(index, cmdseq.Command(POSTCOMPILER_CMD["exe"], POSTCOMPILER_CMD["args"]))
 					vLog("\t--- Found VBSP, appended command ---")
 					cmdsAdded += 1
-				else:
-					if POSTCOMPILER_CMD["args"] != argValue:
-						commands.pop(index)
-						commands.insert(index, cmdseq.Command(POSTCOMPILER_CMD["exe"], POSTCOMPILER_CMD["args"]))
-						vLog("\t--- Found postcompiler, re-appended command with new args ---")
-						cmdsAdded += 1
+				elif POSTCOMPILER_CMD["args"] != argValue:
+					commands.pop(index)
+					commands.insert(index, cmdseq.Command(POSTCOMPILER_CMD["exe"], POSTCOMPILER_CMD["args"]))
+					vLog("\t--- Found postcompiler, re-appended command with new args ---")
+					cmdsAdded += 1
 				break
 			if exeValue == "$bsp_exe":
 				foundBsp = True
@@ -507,7 +499,7 @@ def downloadAddons():
 		if ver.lower() == "latest":
 			# If ver arg is "latest" we get the first key and value from the versions dict
 			return (tuple(versions.keys())[0], tuple(versions.values())[0])
-		elif verS in versions.keys():
+		elif verS in versions:
 			# If the stripped ver is a key inside versions, return itself and it's value in the dict
 			return (verS, versions[verS])
 		else:
