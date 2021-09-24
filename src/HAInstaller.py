@@ -91,11 +91,11 @@ def msgLogger(*values: object, type: str = None, blink: bool = False, end: str =
 		pbColor = (92, 160, 255)
 
 	global progressBar
-	progressBar.colorset = {
+	progressBar.colorset |= {
 		"horiz":	pbColor,
 		"vert":		pbColor,
 		"corner":	pbColor,
-		"text":		{"outside":	pbColor}
+		"text":		pbColor
 	}
 	progressBar.draw()
 
@@ -623,7 +623,7 @@ def main():
 	parseArgs()
 	isSysX64 = "64" in architecture()[0]
 
-	progressBar = pbar.PBar(range=(0, 6), position=(23, 4), text="Preparing...")
+	progressBar = pbar.PBar(range=(0, 6), position=(23, 4), text="Preparing...", colorset=pbar.ColorSet.GREEN_RED)
 	progressBar.enabled = not args.noPbar and not args.verbose
 
 	print(f"{VT100.BUFFER_NEW}\n{VT100.color((0, 255, 255))}{VT100.UNDERLINE}TeamSpen's Hammer Addons Installer - v{VERSION}{VT100.RESET}\n")
@@ -649,22 +649,20 @@ def main():
 				runsys("pause > nul")
 				print(VT100.moveVert(-1), end="")
 
-		progressBar.text = "Processing CmdSeq"
-		progressBar.step()
+		progressBar.step(text="Processing CmdSeq")
 		if not args.skipCmdSeq: parseCmdSeq()
-		progressBar.text = "Processing Gameinfo"
-		progressBar.step()
+
+		progressBar.step(text="Processing Gameinfo")
 		if not args.skipGameinfo: parseGameInfo()
-		progressBar.text = "Downloading files"
-		progressBar.step()
+
+		progressBar.step(text="Downloading files")
 		if not args.skipDownload: downloadAddons()
 
 	except KeyboardInterrupt:
 		msgLogger("Installation interrupted", type="error")
 		closeScript(1)
 
-	progressBar.text = "Done!"
-	progressBar.step()
+	progressBar.step(text="Done!")
 	msgLogger(f"Finished installing HammerAddons for {selectedGame}!", type="good", blink=True)
 	closeScript()
 
