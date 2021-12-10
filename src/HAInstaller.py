@@ -12,14 +12,13 @@ from sys import exit
 from platform import architecture
 
 from utils import getIndent, isProcess, Version
-from pbar import VT100
 import pbar
-
+from pbar import Term
 
 
 
 POSTCOMPILER_ARGS = "--propcombine $path\$file"
-VERSION = Version("1.7.3-1")
+VERSION = Version("1.7.4")
 AVAILABLE_GAMES: dict[str, tuple[str, str]] = {
 	# Game definitions. These specify the name of the main game folder, and for every game, the fgd, and the second game folder inside.
 	# Game Folder: (folder2, fgdname)
@@ -65,17 +64,17 @@ def msgLogger(*values: object, type: str = None, blink: bool = False, end: str =
 	"""
 
 	MSG_PREFIX = {
-		"error":    f"{VT100.color((255, 87, 87))}[ E ]",
-		"good":     f"{VT100.color((48, 240, 134))}[ √ ]{VT100.color((255, 255, 255))}",
-		"loading":  f"{VT100.color((235, 175, 66))}[...]",
-		"warning":  f"{VT100.color((92, 160, 2557))}[ ! ]"
+		"error":    f"{Term.color((255, 87, 87))}[ E ]",
+		"good":     f"{Term.color((48, 240, 134))}[ √ ]{Term.color((255, 255, 255))}",
+		"loading":  f"{Term.color((235, 175, 66))}[...]",
+		"warning":  f"{Term.color((92, 160, 2557))}[ ! ]"
 	}
 
 	strs = sep.replace("\n", "\n      ").join(str(item) for item in values)
-	msg = f"{VT100.moveHoriz(-9999)}{VT100.UNDERLINE}{MSG_PREFIX.get(type, '[   ]')}{VT100.NO_UNDERLINE} {strs}{VT100.RESET}{VT100.CLEAR_RIGHT}"
+	msg = f"{Term.moveHoriz(-9999)}{Term.UNDERLINE}{MSG_PREFIX.get(type, '[   ]')}{Term.NO_UNDERLINE} {strs}{Term.RESET}{Term.CLEAR_RIGHT}"
 
 	if blink:
-		print(f"{VT100.UNDERLINE}{msg}{VT100.NO_UNDERLINE}", end="", flush=True)
+		print(f"{Term.UNDERLINE}{msg}{Term.NO_UNDERLINE}", end="", flush=True)
 		sleep(0.25)
 
 	sleep(0.15)
@@ -111,7 +110,7 @@ def closeScript(errorlevel: int = 0):
 	"""Closes the script with an errorlevel"""
 
 	runsys("pause > nul")
-	print(VT100.BUFFER_OLD, end="")
+	print(Term.BUFFER_OLD, end="")
 	vLog("Script terminated\n\n\n\n", onlyAppend=True)
 	exit(errorlevel)
 
@@ -157,8 +156,8 @@ def parseArgs():
 			Using version {VERSION}
 
 			Repositories:
-				HAInstaller:    {VT100.UNDERLINE}https://github.com/DarviL82/HAInstaller{VT100.NO_UNDERLINE}
-				HammerAddons:   {VT100.UNDERLINE}https://github.com/TeamSpen210/HammerAddons{VT100.NO_UNDERLINE}
+				HAInstaller:    {Term.UNDERLINE}https://github.com/DarviL82/HAInstaller{Term.NO_UNDERLINE}
+				HammerAddons:   {Term.UNDERLINE}https://github.com/TeamSpen210/HammerAddons{Term.NO_UNDERLINE}
 			"""
 		),
 		formatter_class=argparse.RawTextHelpFormatter
@@ -193,33 +192,6 @@ def getSteamPath() -> tuple[str]:
 	First checks the registry key for SteamPath, and if it can't find it, the path will be prompted to the user.
 	"""
 
-	def checkPath(foldername: str) -> bool:
-		"""Check if the filepath supplied is valid and actually contains Steam."""
-
-		# Check if the path supplied is actually the true Steam path by checking if it contains every file in STEAM_CONTENTS
-		if path.isdir(foldername):
-			dirLS = listdir(foldername)
-			# All the files that the main Steam path should contain
-			STEAM_CONTENTS = {
-				'crashhandler.dll', 'crashhandler64.dll', 'CSERHelper.dll', 'd3dcompiler_46.dll', 'd3dcompiler_46_64.dll', 'GameOverlayRenderer.dll', 'GameOverlayRenderer64.dll',
-				'GfnRuntimeSdk.dll', 'icui18n.dll', 'icuuc.dll', 'openvr_api.dll', 'SDL2.dll', 'SDL2_ttf.dll', 'Steam.dll', 'Steam2.dll', 'steamclient.dll', 'steamclient64.dll',
-				'SteamOverlayVulkanLayer.dll', 'SteamOverlayVulkanLayer64.dll', 'SteamUI.dll', 'steamwebrtc.dll', 'steamwebrtc64.dll', 'tier0_s.dll', 'tier0_s64.dll', 'v8.dll', 'video.dll',
-				'VkLayer_steam_fossilize.dll', 'VkLayer_steam_fossilize64.dll', 'GameOverlayUI.exe', 'steam.exe', 'steamerrorreporter.exe', 'steamerrorreporter64.exe','streaming_client.exe',
-				'uninstall.exe', 'WriteMiniDump.exe'
-			}
-
-			missingFiles = [file for file in STEAM_CONTENTS if file not in dirLS]
-
-			if missingFiles:
-				vLog(f"\tDirectory '{foldername}' is missing the next file/s: '" + "', '".join(missingFiles) + "'")
-				msgLogger(f"The directory '{foldername}' isn't a valid Steam directory. (Missing {len(missingFiles)} file/s.)", type="error")
-				return False
-			else:
-				return True
-		else:
-			msgLogger(f"The directory '{foldername}' does not exist.", type="error")
-
-
 	msgLogger("Finding Steam", type="loading")
 
 	try:
@@ -232,12 +204,12 @@ def getSteamPath() -> tuple[str]:
 		folder = input()
 
 	# Continue asking for path until it is valid
-	while not checkPath(folder):
+	while not path.isdir(folder):
 		msgLogger("Try again: ", type="loading", end="")
 		folder = input()
 
 
-	steamlibs: list[str] = [folder]
+	steamlibs: list[str] = [folder.lower()]
 
 	# Find other steam libraries (thanks TeamSpen)
 	try:
@@ -249,20 +221,22 @@ def getSteamPath() -> tuple[str]:
 		for prop in conf.find_key("LibraryFolders"):
 			if prop.name.isdigit():
 				# Huh, seems like this file has a new structure, so we check if it contains kvs inside or not
-				if prop.has_children():
-					lib = prop.value[0].value
-				else:
-					lib = prop.value
-
+				lib = prop.value[0].value if prop.has_children() else prop.value
 				if path.isdir(path.join(lib, "steamapps/common")):
-					steamlibs.append(lib)
+					steamlibs.append(lib.replace("\\", "/").lower())
+
+	# remove possible duplicates
+	steamlibs = tuple(set(steamlibs))
 
 	if len(steamlibs) > 1:
-		msgLogger(f"Found Steam libraries:\n\t'" + "'\n\t'".join(steamlibs) + "'", type="good")
+		msgLogger(
+		    "Found Steam libraries:\n\t'" + "'\n\t'".join(steamlibs) + "'",
+		    type="good",
+		)
 	else:
 		msgLogger(f"Found Steam library '{folder}'", type="good")
 
-	return tuple(steamlibs)
+	return steamlibs
 
 
 
@@ -322,12 +296,12 @@ def selectGame(steamlibs: tuple) -> tuple[str, str]:
 				raise ValueError
 
 			# The value is correct, so we move the cursor up the same number of lines taken by the menu to drawn, so then we can override it
-			print(VT100.moveVert(-len(usingGames) - 2) + VT100.CLEAR_DOWN, end="")
+			print(Term.moveVert(-len(usingGames) - 2) + Term.CLEAR_DOWN, end="")
 			msgLogger(f"Selected game '{usingGames[usrInput - 1][0]}'", type="good")
 			return tuple(usingGames[usrInput - 1])
 		except (ValueError, IndexError):
 			# If the value isn't valid, we move the terminal cursor up and then clear the line. This is done to not cause ugly spam when typing values
-			print(VT100.moveVert(-1) + VT100.CLEAR_LINE, end="")
+			print(Term.moveVert(-1) + Term.CLEAR_LINE, end="")
 
 
 
@@ -619,15 +593,18 @@ def downloadAddons():
 def main():
 	global inGameFolder, selectedGame, commonPath, progressBar, isSysX64
 
-	runsys("")  # This is required to be able to display VT100 sequences on Windows 10
+	runsys("")  # This is required to be able to display Term sequences on Windows 10
 	parseArgs()
 	isSysX64 = "64" in architecture()[0]
 
-	progressBar = pbar.PBar(range=(0, 6), position=(23, 4), text="Preparing...", colorset=pbar.ColorSet.GREEN_RED)
+	progressBar = pbar.PBar(prange=(0, 6), position=(23, 3), text="Preparing...")
 	progressBar.enabled = not args.noPbar and not args.verbose
 
-	print(f"{VT100.BUFFER_NEW}\n{VT100.color((0, 255, 255))}{VT100.UNDERLINE}TeamSpen's Hammer Addons Installer - v{VERSION}{VT100.RESET}\n")
-	if progressBar.enabled: print("\n\n\n")
+	print(
+		Term.BUFFER_NEW
+		+ Term.formatStr("<#0ff>-TeamSpen's Hammer Addons Installer \- v", False) + f"{VERSION}{Term.RESET}"
+		+ (Term.margin(5) + "\n\n\n\n" if progressBar.enabled else "")
+	)
 
 	progressBar.draw()
 
@@ -647,7 +624,7 @@ def main():
 			while isProcess("hammer.exe"):
 				msgLogger("Hammer is running, please close it before continuing. Press any key to retry.", type="error", blink=True)
 				runsys("pause > nul")
-				print(VT100.moveVert(-1), end="")
+				print(Term.moveVert(-1), end="")
 
 		progressBar.step(text="Processing CmdSeq")
 		if not args.skipCmdSeq: parseCmdSeq()
