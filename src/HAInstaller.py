@@ -1,28 +1,33 @@
+import os
+import shutil
 from time import sleep
 import winreg
 import argparse
 from os import path, listdir, system as runsys
 from srctools import cmdseq, clean_line, Property
-from tempfile import TemporaryFile
+from tempfile import TemporaryFile, TemporaryDirectory
 from urllib import request
 from json import loads as jsonLoads
 from zipfile import ZipFile
 from textwrap import dedent
 from sys import exit
 from platform import architecture
+from distutils.dir_util import copy_tree
 
 from utils import getIndent, isProcess, Version
 import pbar
 from pbar import Term
 
 
-
 POSTCOMPILER_ARGS = "--propcombine $path\$file"
-VERSION = Version("1.7.4")
+VERSION = Version("1.7.5")
+RELEASES_URL = "https://api.github.com/repos/TeamSpen210/HammerAddons/releases"
+VDF_URL = (
+	"https://raw.githubusercontent.com/DarviL82/HAInstaller/main/resources/srctools.vdf"
+)
 AVAILABLE_GAMES: dict[str, tuple[str, str]] = {
 	# Game definitions. These specify the name of the main game folder, and for every game, the fgd, and the second game folder inside.
 	# Game Folder: (folder2, fgdname)
-
 	"Alien Swarm": ("asw", "swarm"),
 	"Black Mesa": ("bms", "blackmesa"),
 	"Counter-Strike Global Offensive": ("csgo", "csgo"),
@@ -33,41 +38,38 @@ AVAILABLE_GAMES: dict[str, tuple[str, str]] = {
 	"Left 4 Dead 2": ("left4dead2", "left4dead2"),
 	"Portal": ("portal", "portal"),
 	"Portal 2": ("portal2", "portal2"),
-	"Team Fortress 2": ("tf", "tf")
+	"Team Fortress 2": ("tf", "tf"),
 }
-
-
-
-
-
-
 
 
 def vLog(message: str, end="\n", onlyAppend: bool = False):
 	"""Prints a message if verbose is on"""
 
 	if args.verbose:
-		if not onlyAppend: print(message, end=end, flush=True)
+		if not onlyAppend:
+			print(message, end=end, flush=True)
 
 		with open("HAInstaller.log", "a", errors="ignore") as f:
 			f.write(message + end)
 
 
-
-
-
-
-def msgLogger(*values: object, type: str = None, blink: bool = False, end: str = "\n", sep: str = " "):
+def msgLogger(
+	*values: object,
+	type: str = None,
+	blink: bool = False,
+	end: str = "\n",
+	sep: str = " ",
+):
 	"""
 	Print a message out on the terminal.
 	@type: Available types: `good, error, loading, warning`
 	"""
 
 	MSG_PREFIX = {
-		"error":    f"{Term.color((255, 87, 87))}[ E ]",
-		"good":     f"{Term.color((48, 240, 134))}[ √ ]{Term.color((255, 255, 255))}",
-		"loading":  f"{Term.color((235, 175, 66))}[...]",
-		"warning":  f"{Term.color((92, 160, 2557))}[ ! ]"
+		"error": f"{Term.color((255, 87, 87))}[ E ]",
+		"good": f"{Term.color((48, 240, 134))}[ √ ]{Term.color((255, 255, 255))}",
+		"loading": f"{Term.color((235, 175, 66))}[...]",
+		"warning": f"{Term.color((92, 160, 2557))}[ ! ]",
 	}
 
 	strs = sep.replace("\n", "\n      ").join(str(item) for item in values)
@@ -91,19 +93,17 @@ def msgLogger(*values: object, type: str = None, blink: bool = False, end: str =
 
 	global progressBar
 	progressBar.colorset |= {
-		"horiz":	pbColor,
-		"vert":		pbColor,
-		"corner":	pbColor,
-		"text":		pbColor
+		"horiz": pbColor,
+		"vert": pbColor,
+		"corner": pbColor,
+		"text": pbColor,
 	}
 	progressBar.draw()
 
 	print(msg, end=end)
-	vLog(f">>> ({type}): {strs}", onlyAppend=True)		# print also to file if verbose is on
-
-
-
-
+	vLog(
+		f">>> ({type}): {strs}", onlyAppend=True
+	)  # print also to file if verbose is on
 
 
 def closeScript(errorlevel: int = 0):
@@ -113,12 +113,6 @@ def closeScript(errorlevel: int = 0):
 	print(Term.BUFFER_OLD, end="")
 	vLog("Script terminated\n\n\n\n", onlyAppend=True)
 	exit(errorlevel)
-
-
-
-
-
-
 
 
 def checkUpdates():
@@ -136,15 +130,12 @@ def checkUpdates():
 		closeScript(1)
 
 	if version > VERSION:
-		msgLogger(f"There is a new version available.\n\tUsing:\t{VERSION}\n\tLatest:\t{version}", type="warning")
+		msgLogger(
+			f"There is a new version available.\n\tUsing:\t{VERSION}\n\tLatest:\t{version}",
+			type="warning",
+		)
 	else:
 		msgLogger("Using latest version", type="good")
-
-
-
-
-
-
 
 
 def parseArgs():
@@ -152,7 +143,8 @@ def parseArgs():
 
 	global args
 	argparser = argparse.ArgumentParser(
-		epilog=dedent(f"""\
+		epilog=dedent(
+			f"""\
 			Using version {VERSION}
 
 			Repositories:
@@ -160,29 +152,49 @@ def parseArgs():
 				HammerAddons:   {Term.UNDERLINE}https://github.com/TeamSpen210/HammerAddons{Term.NO_UNDERLINE}
 			"""
 		),
-		formatter_class=argparse.RawTextHelpFormatter
+		formatter_class=argparse.RawTextHelpFormatter,
 	)
-	argparser.add_argument("-a", "--args", help=f"Arguments for the PostCompiler executable. Default are '{POSTCOMPILER_ARGS}'.", default=POSTCOMPILER_ARGS)
-	argparser.add_argument("-g", "--game", help="The name of the game folder in which the addons will be installed.")
-	argparser.add_argument("-v", "--version", help="Select the version of HammerAddons to install. Please keep in mind that some versions\nmight not be compatible with all the games. Default value is 'latest'.", default="latest")
-	argparser.add_argument("--skipCmdSeq", help="Do not modify the CmdSeq.wc file.", action="store_true")
-	argparser.add_argument("--skipGameinfo", help="Do not modify the gameinfo.txt file.", action="store_true")
-	argparser.add_argument("--skipDownload", help="Do not download any files.", action="store_true")
-	argparser.add_argument("--verbose", help="Show more information of all the steps and create a log file", action="store_true")
-	argparser.add_argument("--ignoreHammer", help="Do not check if Hammer is running.", action="store_true")
-	argparser.add_argument("--chkup", help="Check for new versions of the installer.", action="store_true")
-	argparser.add_argument("--noPbar", help="Disable the progress bar", action="store_true")
+	argparser.add_argument(
+		"-a",
+		"--args",
+		help=f"Arguments for the PostCompiler executable. Default are '{POSTCOMPILER_ARGS}'.",
+		default=POSTCOMPILER_ARGS,
+	)
+	argparser.add_argument(
+		"-g",
+		"--game",
+		help="The name of the game folder in which the addons will be installed.",
+	)
+	argparser.add_argument(
+		"--skipCmdSeq", help="Do not modify the CmdSeq.wc file.", action="store_true"
+	)
+	argparser.add_argument(
+		"--skipGameinfo",
+		help="Do not modify the gameinfo.txt file.",
+		action="store_true",
+	)
+	argparser.add_argument(
+		"--skipDownload", help="Do not download any files.", action="store_true"
+	)
+	argparser.add_argument(
+		"--verbose",
+		help="Show more information of all the steps and create a log file",
+		action="store_true",
+	)
+	argparser.add_argument(
+		"--ignoreHammer", help="Do not check if Hammer is running.", action="store_true"
+	)
+	argparser.add_argument(
+		"--chkup", help="Check for new versions of the installer.", action="store_true"
+	)
+	argparser.add_argument(
+		"--noPbar", help="Disable the progress bar", action="store_true"
+	)
 	args = argparser.parse_args()
 
 	if args.chkup:
 		checkUpdates()
 		exit()
-
-
-
-
-
-
 
 
 def getSteamPath() -> tuple[str]:
@@ -200,14 +212,17 @@ def getSteamPath() -> tuple[str]:
 		folder = winreg.QueryValueEx(hkey, "SteamPath")[0]
 		winreg.CloseKey(hkey)
 	except Exception:
-		msgLogger("Couldn't find the Steam path, please specify a directory: ", type="loading", end="")
+		msgLogger(
+			"Couldn't find the Steam path, please specify a directory: ",
+			type="loading",
+			end="",
+		)
 		folder = input()
 
 	# Continue asking for path until it is valid
 	while not path.isdir(folder):
 		msgLogger("Try again: ", type="loading", end="")
 		folder = input()
-
 
 	steamlibs: list[str] = [folder.lower()]
 
@@ -216,12 +231,11 @@ def getSteamPath() -> tuple[str]:
 		with open(path.join(folder, "steamapps/libraryfolders.vdf")) as file:
 			conf = Property.parse(file)
 	except FileNotFoundError:
-			pass
+		pass
 	else:
 		for prop in conf.find_key("LibraryFolders"):
 			if prop.name.isdigit():
-				# Huh, seems like this file has a new structure, so we check if it contains kvs inside or not
-				lib = prop.value[0].value if prop.has_children() else prop.value
+				lib = prop[0].value
 				if path.isdir(path.join(lib, "steamapps/common")):
 					steamlibs.append(lib.replace("\\", "/").lower())
 
@@ -230,19 +244,13 @@ def getSteamPath() -> tuple[str]:
 
 	if len(steamlibs) > 1:
 		msgLogger(
-		    "Found Steam libraries:\n\t'" + "'\n\t'".join(steamlibs) + "'",
-		    type="good",
+			"Found Steam libraries:\n\t'" + "'\n\t'".join(steamlibs) + "'",
+			type="good",
 		)
 	else:
 		msgLogger(f"Found Steam library '{folder}'", type="good")
 
 	return steamlibs
-
-
-
-
-
-
 
 
 def selectGame(steamlibs: tuple) -> tuple[str, str]:
@@ -257,11 +265,14 @@ def selectGame(steamlibs: tuple) -> tuple[str, str]:
 
 	for lib in steamlibs:
 		common = path.join(lib, "steamapps/common")
-		for game in listdir(common):
-			if game in AVAILABLE_GAMES and path.exists(
-					path.join(common, game, AVAILABLE_GAMES[game][0], "gameinfo.txt")):
-				usingGames.append((game, lib))
-
+		usingGames.extend(
+			(game, lib)
+			for game in listdir(common)
+			if game in AVAILABLE_GAMES
+			and path.exists(
+				path.join(common, game, AVAILABLE_GAMES[game][0], "gameinfo.txt")
+			)
+		)
 	if not usingGames:
 		# No supported games found, quitting
 		msgLogger("Couldn't find any game supported by HammerAddons", type="error")
@@ -273,21 +284,21 @@ def selectGame(steamlibs: tuple) -> tuple[str, str]:
 			for game, lib in usingGames:
 				if args.game == game:
 					msgLogger(f"Selected game '{args.game}'", type="good")
-					return tuple((game, lib))
+					return game, lib
 
 			msgLogger(f"The game '{args.game}' is not installed", type="error")
 		else:
 			msgLogger(f"The game '{args.game}' is not supported", type="error")
 
-
 	# Print a simple select menu with all the available choices
 	msgLogger("Select a game to install HammerAddons", type="loading")
 	for number, game in enumerate(usingGames):
 		if args.verbose:
-			print(f"\t{number + 1}: {game[0]} ('{path.join(game[1], 'steamapps/common/', game[0])}')")
+			print(
+				f"\t{number + 1}: {game[0]} ('{path.join(game[1], 'steamapps/common/', game[0])}')"
+			)
 		else:
 			print(f"\t{number + 1}: {game[0]}")
-	print("")
 
 	while True:
 		try:
@@ -296,18 +307,12 @@ def selectGame(steamlibs: tuple) -> tuple[str, str]:
 				raise ValueError
 
 			# The value is correct, so we move the cursor up the same number of lines taken by the menu to drawn, so then we can override it
-			print(Term.moveVert(-len(usingGames) - 2) + Term.CLEAR_DOWN, end="")
+			print(Term.moveVert(-len(usingGames) - 1) + Term.CLEAR_DOWN, end="")
 			msgLogger(f"Selected game '{usingGames[usrInput - 1][0]}'", type="good")
 			return tuple(usingGames[usrInput - 1])
 		except (ValueError, IndexError):
 			# If the value isn't valid, we move the terminal cursor up and then clear the line. This is done to not cause ugly spam when typing values
 			print(Term.moveVert(-1) + Term.CLEAR_LINE, end="")
-
-
-
-
-
-
 
 
 def parseCmdSeq():
@@ -319,39 +324,34 @@ def parseCmdSeq():
 	cmdSeqPath = path.join(gameBin, "CmdSeq.wc")
 	cmdSeqDefaultPath = path.join(gameBin, "CmdSeqDefault.wc")
 
-	if Version(args.version) >= Version("2.4.0") or args.version == "latest":
-		compFolder = "postcompiler_win64" if isSysX64 else "postcompiler_win32"
-	else:
-		compFolder = "postcompiler"
-
-
 	# Postcompiler command definition
 	POSTCOMPILER_CMD: dict[str, str] = {
-		"exe": path.join(gameBin, f"{compFolder}/postcompiler.exe"),
-		"args": args.args.lower()
+		"exe": path.join(gameBin, "postcompiler/postcompiler.exe"),
+		"args": args.args.lower(),
 	}
 
 	# If the CmdSeq.wc file does not exist, we then check for the file CmdSeqDefault.wc, which has the default commands. Copy it as CmdSeq.wc
 	if not path.isfile(cmdSeqPath):
 		if path.isfile(cmdSeqDefaultPath):
-			with open(cmdSeqDefaultPath, "rb") as defCmdFile, open(cmdSeqPath, "wb") as CmdFile:
+			with open(cmdSeqDefaultPath, "rb") as defCmdFile, open(
+				cmdSeqPath, "wb"
+			) as CmdFile:
 				CmdFile.write(defCmdFile.read())
 		else:
 			msgLogger(
 				f"Couldn't find the 'CmdSeqDefault.wc' file in the game directory '{gameBin}'.",
 				"Open the Compile dialog (F9) in Hammer to generate the file, then try again.",
-				type="error", sep="\n"
+				type="error",
+				sep="\n",
 			)
 			closeScript(1)
-
-
 
 	with open(cmdSeqPath, "rb") as cmdfile:
 		data = cmdseq.parse(cmdfile)
 
 	# We check for the existence of the bsp command. If found, we append the postcompiler command right after it
-	cmdsAdded = 0	# times we appended a postcompiler command
-	cmdsFound = 0	# times we found VBSP
+	cmdsAdded = 0  # times we appended a postcompiler command
+	cmdsFound = 0  # times we found VBSP
 	for config in data:
 		foundBsp = False
 		commands = data[config]
@@ -362,17 +362,31 @@ def parseCmdSeq():
 			exeValue = str(cmd.exe).lower()
 			argValue = str(cmd.args).lower()
 
-			vLog(f"\t\tL Command:\n\t\t\tExe:      '{exeValue}'\n\t\t\tArgument: '{argValue}'")
+			vLog(
+				f"\t\tL Command:\n\t\t\tExe:      '{exeValue}'\n\t\t\tArgument: '{argValue}'"
+			)
 
 			if foundBsp:
 				if "postcompiler" not in exeValue:
-					commands.insert(index, cmdseq.Command(POSTCOMPILER_CMD["exe"], POSTCOMPILER_CMD["args"]))
+					commands.insert(
+						index,
+						cmdseq.Command(
+							POSTCOMPILER_CMD["exe"], POSTCOMPILER_CMD["args"]
+						),
+					)
 					vLog("\t--- Found VBSP, appended command ---")
 					cmdsAdded += 1
 				elif POSTCOMPILER_CMD["args"] != argValue:
 					commands.pop(index)
-					commands.insert(index, cmdseq.Command(POSTCOMPILER_CMD["exe"], POSTCOMPILER_CMD["args"]))
-					vLog("\t--- Found postcompiler, re-appended command with new args ---")
+					commands.insert(
+						index,
+						cmdseq.Command(
+							POSTCOMPILER_CMD["exe"], POSTCOMPILER_CMD["args"]
+						),
+					)
+					vLog(
+						"\t--- Found postcompiler, re-appended command with new args ---"
+					)
 					cmdsAdded += 1
 				break
 			if exeValue == "$bsp_exe":
@@ -389,12 +403,6 @@ def parseCmdSeq():
 		with open(cmdSeqPath, "wb") as cmdfile:
 			cmdseq.write(data, cmdfile)
 		msgLogger(f"Added {cmdsAdded} command/s successfully", type="good")
-
-
-
-
-
-
 
 
 def parseGameInfo():
@@ -433,60 +441,54 @@ def parseGameInfo():
 			break
 
 
+def getZipUrl(ver: str) -> tuple[str, str]:
+	"""
+	Return a tuple with the version tag, and the url of the zip download page from the version specified. (`(verTag, zipUrl)`)
 
+	- `ver` is a string containing a version value, or `latest`.
+	"""
 
+	verS = Version(ver)
 
+	with request.urlopen(RELEASES_URL) as data:
+		data = jsonLoads(data.read())
 
+	# Create a dict with all the versionTags: zipUrls
+	# We iterate through every release getting the only values that we need, the "tag_name", and the "browser_download_url"
+	versions: dict[str, str] = {}
+
+	for release in data:
+		tag = Version(release["tag_name"])
+		url = release["assets"][0]["browser_download_url"]
+		versions[tag] = url
+		vLog(f"\tFound version {tag}\t('{url}')")
+
+	if ver.lower() == "latest":
+		# If ver arg is "latest" we get the first key and value from the versions dict
+		return (tuple(versions.keys())[0], tuple(versions.values())[0])
+	elif verS in versions:
+		# If the stripped ver is a key inside versions, return itself and it's value in the dict
+		return (verS, versions[verS])
+	else:
+		# We didn't succeed, generate an error message and exit
+		msgLogger(
+			f"Version '{ver}' does not exist, available versions: '"
+			+ "', '".join(map(str, versions.keys()))
+			+ "'",
+			type="error",
+		)
+		closeScript(1)
 
 
 def downloadAddons():
 	"""Download and unzip all necessary files."""
 
 	gamePath = path.join(commonPath, selectedGame)
-	releasesUrl = "https://api.github.com/repos/TeamSpen210/HammerAddons/releases"
-	vdfUrl = "https://raw.githubusercontent.com/DarviL82/HAInstaller/main/resources/srctools.vdf"
-
-
-	def getZipUrl(ver: str) -> tuple[str, str]:
-		"""
-		Return a tuple with the version tag, and the url of the zip download page from the version specified. (`(verTag, zipUrl)`)
-
-		- `ver` is a string containing a version value, or `latest`.
-		"""
-
-		verS = Version(ver)
-
-		with request.urlopen(releasesUrl) as data:
-			data = jsonLoads(data.read())
-
-		# Create a dict with all the versionTags: zipUrls
-		# We iterate through every release getting the only values that we need, the "tag_name", and the "browser_download_url"
-		versions: dict[str, str] = {}
-
-		for release in data:
-			tag = Version(release["tag_name"])
-			url = release["assets"][0]["browser_download_url"]
-			versions[tag] = url
-			vLog(f"\tFound version {tag}\t('{url}')")
-
-
-		if ver.lower() == "latest":
-			# If ver arg is "latest" we get the first key and value from the versions dict
-			return (tuple(versions.keys())[0], tuple(versions.values())[0])
-		elif verS in versions:
-			# If the stripped ver is a key inside versions, return itself and it's value in the dict
-			return (verS, versions[verS])
-		else:
-			# We didn't succeed, generate an error message and exit
-			msgLogger(f"Version '{ver}' does not exist, available versions: '" + "', '".join(map(str, versions.keys())) + "'", type="error")
-			closeScript(1)
-
-
 
 	try:
-		msgLogger(f"Looking up for {args.version} version", type="loading")
+		msgLogger("Looking up for latest version", type="loading")
 
-		version, zipUrl = getZipUrl(args.version)
+		version, zipUrl = getZipUrl("latest")
 
 		msgLogger(f"Downloading required files of version {version}", type="loading")
 
@@ -496,49 +498,53 @@ def downloadAddons():
 
 			tempfile.write(data.read())
 
-			vLog(f"Done")
-			msgLogger(f"Unzipping files", type="loading")
+			vLog("Done")
+			msgLogger("Unzipping files", type="loading")
 
-			with ZipFile(tempfile) as zipfile:
-				for file in zipfile.namelist():
-					# Extract the files found to the locations that we want
-					if file.startswith("postcompiler"):
-						if isSysX64 and file.startswith("postcompiler_win64/"):
-							zipfile.extract(file, path.join(gamePath, "bin/"))
-							vLog(f"\tExtracted file '{selectedGame}/bin/{file}'")
+			with ZipFile(tempfile) as zipfile, TemporaryDirectory() as tempdir:
+				zipfile.extractall(tempdir)
 
-						elif not isSysX64 and file.startswith("postcompiler_win32/"):
-							zipfile.extract(file, path.join(gamePath, "bin/"))
-							vLog(f"\tExtracted file '{selectedGame}/bin/{file}'")
+				# iterate through all files in the tempdir
+				for file_name, file_path in (
+					(f, path.join(tempdir, f)) for f in os.listdir(tempdir)
+				):
+					if (file_name == "win64" and isSysX64) or (
+						file_name == "win32" and not isSysX64
+					):
+						# move the win64/postcompiler folder to the game folder
+						copy_tree(
+							path.join(file_path, "postcompiler"),
+							path.join(gamePath, "bin/postcompiler"),
+						)
+						vLog(f"\tMoved 'postcompiler' to '{gamePath}/bin/'")
 
-						elif file.startswith("postcompiler/"):
-							zipfile.extract(file, path.join(gamePath, "bin/"))
-							vLog(f"\tExtracted file '{selectedGame}/bin/{file}'")
+					elif file_name == "hammer":
+						# move the hammer folder to the game folder
+						copy_tree(file_path, path.join(gamePath, "hammer"))
+						vLog(f"\tMoved 'hammer' to '{gamePath}/'")
 
+					elif file_name == "instances" and path.exists(
+						path.join(file_path, inGameFolder)
+					):
+						# move the instances folder to the game folder
+						copy_tree(file_path, path.join(gamePath, "sdk_content/maps"))
+						vLog(f"\tMoved 'instances' to '{gamePath}/sdk_content/maps'")
 
-
-					if file.startswith("hammer/"):
-						zipfile.extract(file, gamePath)
-						vLog(f"\tExtracted file '{selectedGame}/{file}'")
-					elif file.startswith(f"instances/{inGameFolder}/"):
-						zipfile.extract(file, path.join(gamePath, "sdk_content/maps/"))
-						vLog(f"\tExtracted file '{selectedGame}/sdk_content/maps/{file}'")
-
-				# Extract the FGD file to the bin folder
-				zipfile.extract(f"{AVAILABLE_GAMES[selectedGame][1]}.fgd", path.join(gamePath, "bin/"))
-				vLog(f"\tExtracted file '{selectedGame}/bin/{AVAILABLE_GAMES[selectedGame][1]}.fgd'\n\n")
-
+					elif file_name == f"{AVAILABLE_GAMES[selectedGame][1]}.fgd":
+						# move the fgd file to the game folder
+						shutil.copy(file_path, path.join(gamePath, "bin/"))
+						vLog(f"\tMoved '{file_name}' to '{gamePath}/bin/'")
 
 		# Download srctools.vdf, so we can modify it to have the correct game folder inside.
 		vdfPath = path.join(gamePath, "srctools.vdf")
 		if not path.exists(vdfPath):
-			with request.urlopen(vdfUrl) as data:
+			with request.urlopen(VDF_URL) as data:
 				with open(vdfPath, "wb") as file:
-					vLog(f"\tDownloading '{vdfUrl}'... ", end="")
+					vLog(f"\tDownloading '{VDF_URL}'... ", end="")
 
 					file.write(data.read())
 
-					vLog(f"Done")
+					vLog("Done")
 		else:
 			vLog("\tFound 'srctools.vdf'. Skipping.")
 
@@ -551,43 +557,32 @@ def downloadAddons():
 
 			vLog(f"\t{number}: {line}", end="")
 
-			if "\"gameinfo\"" in strip_line:
-				if f"\"{inGameFolder}/\"" in strip_line:
+			if '"gameinfo"' in strip_line:
+				if f'"{inGameFolder}/"' in strip_line:
 					# We found it already in there, skip
 					vLog(f"\t^ Found \"'gameinfo' '{inGameFolder}/'\". Skipping.")
-					break
-
 				else:
 					# It isn't there, remove it and add a new one to match the game
 					data.pop(number)
-					data.insert(number, f"{getIndent(line)}\"gameinfo\" \"{inGameFolder}/\"\n")
+					data.insert(
+						number, f'{getIndent(line)}"gameinfo" "{inGameFolder}/"\n'
+					)
 					vLog(f"\t^ Changed line to \"'gameinfo' '{inGameFolder}/'\".")
 
 					with open(vdfPath, "w") as file:
 						for line in data:
 							file.write(line)
-					break
+				break
 
 	except Exception as error:
-		if args.verbose: raise
-		msgLogger(f"An error ocurred while downloading the files ({error})", type="error")
+		if args.verbose:
+			raise
+		msgLogger(
+			f"An error ocurred while downloading the files ({error})", type="error"
+		)
 		closeScript(1)
 
 	msgLogger("Downloaded all files", type="good")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 def main():
@@ -602,7 +597,9 @@ def main():
 
 	print(
 		Term.BUFFER_NEW
-		+ Term.formatStr("<#0ff>-TeamSpen's Hammer Addons Installer \- v", False) + f"{VERSION}{Term.RESET}"
+		+ Term.CURSOR_HOME
+		+ Term.formatStr("<#0ff>-TeamSpen's Hammer Addons Installer \- v", False)
+		+ f"{VERSION}{Term.RESET}"
 		+ (Term.margin(5) + "\n\n\n\n" if progressBar.enabled else "")
 	)
 
@@ -622,27 +619,35 @@ def main():
 		if not args.ignoreHammer:
 			# We check continuosly if Hammer is open. Once it is closed, we continue.
 			while isProcess("hammer.exe"):
-				msgLogger("Hammer is running, please close it before continuing. Press any key to retry.", type="error", blink=True)
+				msgLogger(
+					"Hammer is running, please close it before continuing. Press any key to retry.",
+					type="error",
+					blink=True,
+				)
 				runsys("pause > nul")
 				print(Term.moveVert(-1), end="")
 
 		progressBar.step(text="Processing CmdSeq")
-		if not args.skipCmdSeq: parseCmdSeq()
+		if not args.skipCmdSeq:
+			parseCmdSeq()
 
 		progressBar.step(text="Processing Gameinfo")
-		if not args.skipGameinfo: parseGameInfo()
+		if not args.skipGameinfo:
+			parseGameInfo()
 
 		progressBar.step(text="Downloading files")
-		if not args.skipDownload: downloadAddons()
+		if not args.skipDownload:
+			downloadAddons()
 
 	except KeyboardInterrupt:
 		msgLogger("Installation interrupted", type="error")
 		closeScript(1)
 
 	progressBar.step(text="Done!")
-	msgLogger(f"Finished installing HammerAddons for {selectedGame}!", type="good", blink=True)
+	msgLogger(
+		f"Finished installing HammerAddons for {selectedGame}!", type="good", blink=True
+	)
 	closeScript()
-
 
 
 if __name__ == "__main__":
