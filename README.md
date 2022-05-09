@@ -4,13 +4,15 @@
 </div>
 
 ## Features
+
 Automatic installer for [TeamSpen's Hammer Addons](https://github.com/TeamSpen210/HammerAddons), featuring:
-* Find the user's Steam library location.
-* Game selector which displays what games the user has installed, and compatible with the addons.
-* Download the latest files from TeamSpen's repository.
-* Add the compile commands for the Hammer compile steps.
-* Append the required 'Hammer' folder in "gameinfo.txt".
-* Modify "srctools.vdf" with the correct game.
+
+- Find the user's Steam library location.
+- Game selector which displays what games the user has installed, and compatible with the addons.
+- Download the latest files from TeamSpen's repository.
+- Add the compile commands for the Hammer compile steps.
+- Append the required 'Hammer' folder in "gameinfo.txt".
+- Modify "srctools.vdf" with the correct game.
 
 <br>
 
@@ -24,9 +26,7 @@ optional arguments:
   -h, --help            show this help message and exit
   -a ARGS, --args ARGS  Arguments for a hammer compile step. Default are '--propcombine $path\$file'
   -g GAME, --game GAME  The name of the game folder in which the addons will be installed.
-  -v VERSION, --version VERSION
-                        Select the version of HammerAddons to install. Please keep in mind that all versions
-                        might not be compatible with all the games. Default value is 'latest'.
+
   --skipCmdSeq          Do not modify the CmdSeq.wc file.
   --skipGameinfo        Do not modify the gameinfo.txt file.
   --skipDownload        Do not download any files.
@@ -38,8 +38,11 @@ optional arguments:
 <hr>
 
 ## Download
-There is a standalone executable available at the [releases page](https://github.com/DarviL82/HAInstaller/releases/latest). Or you can [download the script directly](https://github.com/DarviL82/HAInstaller/blob/main/src/HAInstaller.py) (It requires at least Python 3.9, and the external [srctools](https://github.com/TeamSpen210/srctools) package)
+
+There is a standalone executable available at the [releases page](https://github.com/DarviL82/HAInstaller/releases/latest). Or you can [download the script directly](https://github.com/DarviL82/HAInstaller/blob/main/src/HAInstaller.py) (It requires at least Python 3.9, and the libraries in the requirements.txt file).
+
 > **Note:** The binary will most likely be detected as a virus. But it obviusly isn't (I swear).
 
 ## Special Thanks
-* TeamSpen for creating the addons and srctools.
+
+- TeamSpen for creating the addons and srctools.
