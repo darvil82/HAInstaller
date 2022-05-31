@@ -7,107 +7,107 @@ __all__ = ["getIndent", "isProcess", "Version"]
 
 
 def getIndent(string: str) -> str:
-    """Return indentation from supplied string"""
+	"""Return indentation from supplied string"""
 
-    indent = ""
-    for x in string:
-        if x in " \t":
-            indent += x
-        else:
-            return indent
+	indent = ""
+	for x in string:
+		if x in " \t":
+			indent += x
+		else:
+			return indent
 
 
 def isProcess(process: str) -> bool:
-    """Checks if the process name given is running. String must contain the name of the program to find, including extension."""
+	"""Checks if the process name given is running. String must contain the name of the program to find, including extension."""
 
-    tempFile = f"{environ['TEMP']}\\ha"
+	tempFile = f"{environ['TEMP']}\\ha"
 
-    runsys(f'tasklist /FI "IMAGENAME eq {process}" > {tempFile}')
-    with open(tempFile) as f:
-        return process in f.read()
+	runsys(f'tasklist /FI "IMAGENAME eq {process}" > {tempFile}')
+	with open(tempFile) as f:
+		return process in f.read()
 
 
 class Version:
-    """Simple object for managing versions a bit easier.
-    >>> Version("1.4.5-2") < Version("1.5-6")
-    >>> True
-    """
+	"""Simple object for managing versions a bit easier.
+	>>> Version("1.4.5-2") < Version("1.5-6")
+	>>> True
+	"""
 
-    def __init__(self, version: str, seps: tuple = (".", "-")) -> None:
-        """
-        The string format should be something like `1.2.3` or `1.2.3-4`.
+	def __init__(self, version: str, seps: tuple = (".", "-")) -> None:
+		"""
+		The string format should be something like `1.2.3` or `1.2.3-4`.
 
-        - `sep` is the seperator of every version field. A dot and a '-' is normally what is used.
+		- `sep` is the seperator of every version field. A dot and a '-' is normally what is used.
 
-        The values separated by dots are considered as the 'main' values of the version, and the number
-        after the '-' is considered as a subversion value, which is less important.
-        """
+		The values separated by dots are considered as the 'main' values of the version, and the number
+		after the '-' is considered as a subversion value, which is less important.
+		"""
 
-        self._seps = seps
-        self._stripped = self._strip(version)
-        self._splitted = self._split(self._stripped)
+		self._seps = seps
+		self._stripped = self._strip(version)
+		self._splitted = self._split(self._stripped)
 
-    def _strip(self, string: str) -> str:
-        """Remove any character from string which isn't a number, or any of the separators"""
+	def _strip(self, string: str) -> str:
+		"""Remove any character from string which isn't a number, or any of the separators"""
 
-        endStr = "".join(char for char in string if char.isdigit() or char in ".-")
+		endStr = "".join(char for char in string if char.isdigit() or char in ".-")
 
-        return "0" if not endStr or ".." in endStr else endStr
+		return "0" if not endStr or ".." in endStr else endStr
 
-    def _split(self, ver: str) -> list:
-        split = ver.split(self._seps[1])
-        main = [int(hoho) for hoho in split[0].split(self._seps[0])]
+	def _split(self, ver: str) -> list:
+		split = ver.split(self._seps[1])
+		main = [int(hoho) for hoho in split[0].split(self._seps[0])]
 
-        # Remove all the trailing 0's of version, since those have no value.
-        for number, item in reversed(list(enumerate(main))):
-            if item == 0:
-                main.pop(number)
-            else:
-                break
+		# Remove all the trailing 0's of version, since those have no value.
+		for number, item in reversed(list(enumerate(main))):
+			if item == 0:
+				main.pop(number)
+			else:
+				break
 
-        # Ignore empty fields
-        sub = int(split[1]) if len(split) > 1 and split[1] != "" else 0
-        return [main, sub]
+		# Ignore empty fields
+		sub = int(split[1]) if len(split) > 1 and split[1] != "" else 0
+		return [main, sub]
 
-    def _compare(self, first: object, second: object):
-        ver1 = first._splitted
-        ver2 = second._splitted
+	def _compare(self, first: object, second: object):
+		ver1 = first._splitted
+		ver2 = second._splitted
 
-        if ver1[0] == ver2[0]:
-            # Checking the second value
-            return ver1[1] > ver2[1]
+		if ver1[0] == ver2[0]:
+			# Checking the second value
+			return ver1[1] > ver2[1]
 
-        # Checking main
-        ver2Main = ver2[0]
-        for number, item in enumerate(ver1[0]):
-            if len(ver2Main) == number or item > ver2Main[number]:
-                return True
-            elif item < ver2Main[number]:
-                return False
-            elif item == ver2Main[number]:
-                continue
-        return False
+		# Checking main
+		ver2Main = ver2[0]
+		for number, item in enumerate(ver1[0]):
+			if len(ver2Main) == number or item > ver2Main[number]:
+				return True
+			elif item < ver2Main[number]:
+				return False
+			elif item == ver2Main[number]:
+				continue
+		return False
 
-    def __gt__(self, other) -> bool:
-        return self._compare(self, other)
+	def __gt__(self, other) -> bool:
+		return self._compare(self, other)
 
-    def __ge__(self, other) -> bool:
-        return self.__gt__(other) or self.__eq__(other)
+	def __ge__(self, other) -> bool:
+		return self.__gt__(other) or self.__eq__(other)
 
-    def __lt__(self, other) -> bool:
-        return self._compare(other, self)
+	def __lt__(self, other) -> bool:
+		return self._compare(other, self)
 
-    def __le__(self, other) -> bool:
-        return self.__lt__(other) or self.__eq__(other)
+	def __le__(self, other) -> bool:
+		return self.__lt__(other) or self.__eq__(other)
 
-    def __eq__(self, other) -> bool:
-        return self._splitted == other._splitted
+	def __eq__(self, other) -> bool:
+		return self._splitted == other._splitted
 
-    def __repr__(self) -> str:
-        return self._stripped
+	def __repr__(self) -> str:
+		return self._stripped
 
-    def __hash__(self) -> int:
-        return hash(str(self))
+	def __hash__(self) -> int:
+		return hash(str(self))
 
-    def __str__(self) -> str:
-        return self._stripped
+	def __str__(self) -> str:
+		return self._stripped
